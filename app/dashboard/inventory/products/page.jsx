@@ -743,7 +743,7 @@ export default function ProductsPage() {
 
   return (
     <main className="min-h-screen bg-[#f4f6fb] text-[#0a0d14]">
-      <Sidebar activeLabel="Inventory" />
+      <Sidebar activeLabel="PRODUCTS" />
 
       <div className="lg:pl-72">
         {/* Header */}

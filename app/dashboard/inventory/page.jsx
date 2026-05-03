@@ -6,7 +6,7 @@ import Sidebar from '../Sidebar';
 export default function InventoryHub() {
   return (
     <main className="min-h-screen bg-[#f4f6fb] text-[#0a0d14]">
-      <Sidebar activeLabel="Inventory" />
+      <Sidebar activeLabel="INVENTORY HOME" />
 
       <div className="lg:pl-72">
         {/* Header */}
