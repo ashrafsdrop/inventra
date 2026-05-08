@@ -37,8 +37,31 @@ const defaultNavigationItems = [
       { label: "SALE RETURN", href: "/dashboard/sale-return" },
     ],
   },
-  { label: "Accounts", href: "#", icon: AccountsIcon },
-  { label: "Reports", href: "#", icon: ReportsIcon },
+  {
+    label: "Accounts",
+    href: "/dashboard/accounts",
+    icon: AccountsIcon,
+    submenu: [
+      { label: "ACCOUNT", href: "/dashboard/accounts" },
+      { label: "TRANSACTION", href: "/dashboard/accounts/transaction" },
+      { label: "TRIAL BALANCE", href: "/dashboard/accounts/trial-balance" },
+      { label: "BALANCE SHEET", href: "/dashboard/accounts/balance-sheet" },
+      { label: "INCOME STATEMENT", href: "/dashboard/accounts/income-statement" },
+    ],
+  },
+  {
+    label: "Reports",
+    href: "/dashboard/reports",
+    icon: ReportsIcon,
+    submenu: [
+      { label: "SALES REPORTS", href: "/dashboard/reports/sales" },
+      { label: "INVENTORY REPORTS", href: "/dashboard/reports/inventory" },
+      { label: "PURCHASE REPORTS", href: "/dashboard/reports/purchase" },
+      { label: "FINANCIAL REPORTS", href: "/dashboard/reports/financial" },
+      { label: "CUSTOMER ANALYTICS", href: "/dashboard/reports/customer" },
+      { label: "VENDOR ANALYTICS", href: "/dashboard/reports/vendor" },
+    ],
+  },
   { label: "Settings", href: "#", icon: SettingsIcon },
 ];
 
@@ -184,7 +207,7 @@ export default function Sidebar({ items, activeLabel, brand = "Inventra", subtit
           {navigationItems.map((item) => {
             const hasActiveSubmenuItem = item.submenu?.some((subitem) => subitem.label === activeLabel);
             const isActive = item.label === activeLabel || hasActiveSubmenuItem;
-            const isExpanded = !forcedClosed[item.label] && (expandedItems[item.label] || hasActiveSubmenuItem);
+            const isExpanded = hasActiveSubmenuItem || (!forcedClosed[item.label] && expandedItems[item.label]);
             const hasSubmenu = item.submenu && item.submenu.length > 0;
 
             return (
