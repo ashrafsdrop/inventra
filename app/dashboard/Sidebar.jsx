@@ -176,11 +176,10 @@ export default function Sidebar({ items, activeLabel, brand = "Inventra", subtit
         delete next[label];
         return next;
       });
-      setExpandedItems((prev) => ({ ...prev, [label]: true }));
+      setExpandedItems({ [label]: true });
     } else {
-      // Normal toggle
+      // Accordion behavior: only one submenu stays open at a time
       setExpandedItems((prev) => ({
-        ...prev,
         [label]: !prev[label],
       }));
     }
