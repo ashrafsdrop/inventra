@@ -2,14 +2,14 @@ import csv
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny
 from .models import Customer
 from .serializers import CustomerSerializer
 
 class CustomerViewSet(viewsets.ModelViewSet):
     queryset = Customer.objects.all().order_by('-created_at')
     serializer_class = CustomerSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     search_fields = ['name', 'email', 'phone', 'username']
     ordering_fields = ['name', 'created_at']
 

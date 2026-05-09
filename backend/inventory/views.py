@@ -2,7 +2,8 @@ from datetime import datetime, timezone as dt_timezone
 
 from django.db.models import F, Sum
 from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from .models import Category, Brand, Subcategory, Product, StockMovement
@@ -27,9 +28,10 @@ class SubcategoryViewSet(viewsets.ModelViewSet):
     search_fields = ['name']
 
 class ProductViewSet(viewsets.ModelViewSet):
-    queryset = Product.objects.all().order_by('-created_at')
+    queryset = Product.objects.select_related('category', 'brand', 'subcategory').order_by('-created_at')
     serializer_class = ProductSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
+    parser_classes = [JSONParser, FormParser, MultiPartParser]
     search_fields = ['name', 'sku', 'barcode']
     filterset_fields = ['category', 'brand', 'subcategory', 'active']
     ordering_fields = ['name', 'created_at', 'sale_price', 'quantity']

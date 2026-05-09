@@ -4,7 +4,11 @@ export default async function apiFetch(path, options = {}) {
   if (typeof window === "undefined") throw new Error("apiFetch should be used on the client side");
 
   const token = localStorage.getItem("access_token");
-  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+  const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
+  const headers = {
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
+    ...(options.headers || {}),
+  };
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers });

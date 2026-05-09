@@ -1,49 +1,211 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Sidebar from '../../Sidebar';
+import apiFetch from '../../../lib/api';
 
-const mockCategories = [
-  { id: 'C001', name: 'Electronics', productCount: 342, description: 'Digital devices and components' },
-  { id: 'C002', name: 'Computers & Laptops', productCount: 128, description: 'Desktop and portable computing' },
-  { id: 'C003', name: 'Networking', productCount: 87, description: 'Network infrastructure equipment' },
-  { id: 'C004', name: 'Peripherals', productCount: 215, description: 'Computer accessories and peripherals' },
-  { id: 'C005', name: 'Furniture', productCount: 94, description: 'Office and home furniture' },
-];
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-function SectionHeader({ title, description, badge }) {
+function createEmptyCategoryForm() {
+  return {
+    name: '',
+    description: '',
+  };
+}
+
+function createCategoryForm(category) {
+  if (!category) return createEmptyCategoryForm();
+
+  return {
+    name: category.name || '',
+    description: category.description || '',
+  };
+}
+
+function CategoryModal({ isOpen, isEditMode, initialData, onClose, onSave }) {
+  const [formData, setFormData] = useState(() => createCategoryForm(initialData));
+
+  useEffect(() => {
+    if (isOpen) {
+      queueMicrotask(() => {
+        setFormData(createCategoryForm(initialData));
+      });
+    }
+  }, [isOpen, initialData]);
+
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSave = async () => {
+    if (!formData.name.trim()) {
+      alert('Please enter a category name');
+      return;
+    }
+
+    await onSave(formData);
+    setFormData(createEmptyCategoryForm());
+  };
+
+  if (!isOpen) return null;
+
   return (
-    <div className="flex items-start justify-between gap-4">
-      <div>
-        <h2 className="font-['Syne',sans-serif] text-lg font-bold text-[#0a0d14]">{title}</h2>
-        <p className="text-sm text-[#6b7280]">{description}</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-3xl bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-[rgba(0,0,0,0.07)] px-6 py-4">
+          <h2 className="text-lg font-bold text-[#0a0d14]">{isEditMode ? 'Edit Category' : 'Create Category'}</h2>
+          <button onClick={onClose} className="cursor-pointer text-[#6b7280] hover:text-[#0a0d14]">
+            ✕
+          </button>
+        </div>
+
+        <div className="space-y-5 p-6">
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-[#0a0d14]">
+              <span className="text-[#f43f5e]">*</span> Category Name
+            </label>
+            <input
+              type="text"
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              placeholder="Enter category name"
+              className="w-full rounded-2xl border border-[rgba(0,0,0,0.08)] bg-[#f4f6fb] px-4 py-3 text-sm outline-none transition focus:border-[#4f6ef7] focus:bg-white"
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-[#0a0d14]">Description</label>
+            <textarea
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              rows="4"
+              placeholder="Enter category description"
+              className="w-full resize-none rounded-2xl border border-[rgba(0,0,0,0.08)] bg-[#f4f6fb] px-4 py-3 text-sm outline-none transition focus:border-[#4f6ef7] focus:bg-white"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-3 border-t border-[rgba(0,0,0,0.07)] px-6 py-4">
+          <button
+            onClick={onClose}
+            className="flex-1 cursor-pointer rounded-2xl border border-[rgba(0,0,0,0.08)] bg-white px-4 py-3 text-sm font-medium text-[#2e3347] transition hover:border-[#4f6ef7] hover:text-[#4f6ef7]"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            className="flex-1 cursor-pointer rounded-2xl border-none bg-[#4f6ef7] px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-[#4f6ef7]/25 transition hover:bg-[#3d5ce6]"
+          >
+            {isEditMode ? 'Update' : 'Create'}
+          </button>
+        </div>
       </div>
-      <span className="rounded-2xl bg-[#f4f6fb] px-3 py-2 text-xs font-medium text-[#2e3347]">{badge}</span>
     </div>
   );
 }
 
 export default function CatalogPage() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadCategories = async () => {
+      try {
+        setError('');
+        const data = await apiFetch('/api/inventory/categories/');
+        const list = Array.isArray(data) ? data : data.results || [];
+        const normalized = list.map((category) => ({
+          id: category.id,
+          name: category.name,
+          description: category.description || '',
+          productCount: category.product_count ?? category.productCount ?? 0,
+        }));
+
+        if (mounted) {
+          setCategories(normalized);
+        }
+      } catch (fetchError) {
+        if (mounted) {
+          setError(fetchError.message || 'Failed to load categories');
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadCategories();
+
+    return () => {
+      mounted = false;
+    };
+  }, [reloadKey]);
 
   const filteredCategories = useMemo(() => {
-    if (!searchQuery.trim()) return mockCategories;
+    if (!searchQuery.trim()) return categories;
     const query = searchQuery.toLowerCase();
-    return mockCategories.filter(
+    return categories.filter(
       (category) =>
         category.name.toLowerCase().includes(query) ||
-        category.description.toLowerCase().includes(query)
+        category.description.toLowerCase().includes(query) ||
+        String(category.id).toLowerCase().includes(query)
     );
-  }, [searchQuery]);
+  }, [searchQuery, categories]);
+
+  const handleSaveCategory = async (formData) => {
+    const isEditMode = Boolean(selectedCategory);
+    const endpoint = isEditMode ? `/api/inventory/categories/${selectedCategory.id}/` : '/api/inventory/categories/';
+    const method = isEditMode ? 'PATCH' : 'POST';
+
+    try {
+      await apiFetch(endpoint, {
+        method,
+        body: JSON.stringify(formData),
+      });
+      alert(isEditMode ? 'Category updated successfully!' : 'Category created successfully!');
+      setShowCategoryForm(false);
+      setSelectedCategory(null);
+      setReloadKey((value) => value + 1);
+    } catch (saveError) {
+      alert(saveError.message || 'Failed to save category');
+      throw saveError;
+    }
+  };
+
+  const handleDeleteCategory = async (category) => {
+    const confirmed = window.confirm(`Delete ${category.name}? This will also remove its subcategories and linked products may be affected.`);
+    if (!confirmed) return;
+
+    try {
+      await apiFetch(`/api/inventory/categories/${category.id}/`, {
+        method: 'DELETE',
+      });
+      alert('Category deleted successfully!');
+      if (selectedCategory?.id === category.id) {
+        setSelectedCategory(null);
+      }
+      setReloadKey((value) => value + 1);
+    } catch (deleteError) {
+      alert(deleteError.message || 'Failed to delete category');
+    }
+  };
 
   return (
     <main className="min-h-screen bg-[#f4f6fb] text-[#0a0d14]">
       <Sidebar activeLabel="CATEGORIES" />
 
       <div className="lg:pl-72">
-        {/* Header */}
         <header className="sticky top-0 z-30 border-b border-[rgba(0,0,0,0.06)] bg-[#f4f6fb]/90 backdrop-blur-xl">
           <div className="flex items-center justify-between gap-4 px-4 py-4 md:px-8">
             <div>
@@ -52,7 +214,10 @@ export default function CatalogPage() {
             </div>
 
             <button
-              onClick={() => setShowAddForm(true)}
+              onClick={() => {
+                setSelectedCategory(null);
+                setShowCategoryForm(true);
+              }}
               className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border-none bg-[#4f6ef7] px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-[#4f6ef7]/25 transition hover:bg-[#3d5ce6]"
             >
               ➕ Add Category
@@ -60,10 +225,9 @@ export default function CatalogPage() {
           </div>
         </header>
 
-        {/* Search */}
         <section className="border-b border-[rgba(0,0,0,0.06)] bg-white px-4 py-4 md:px-8">
-          <div className="flex items-center gap-3 max-w-md">
-            <div className="flex-1 flex items-center gap-2 rounded-2xl border border-[rgba(0,0,0,0.08)] bg-[#f4f6fb] px-4 py-3 text-sm">
+          <div className="flex max-w-md items-center gap-3">
+            <div className="flex flex-1 items-center gap-2 rounded-2xl border border-[rgba(0,0,0,0.08)] bg-[#f4f6fb] px-4 py-3 text-sm">
               <span>🔍</span>
               <input
                 type="text"
@@ -76,35 +240,38 @@ export default function CatalogPage() {
           </div>
         </section>
 
-        {/* Table Section */}
         <section className="px-4 py-6 md:px-8">
-          {filteredCategories.length === 0 ? (
+          {loading ? (
+            <div className="rounded-3xl border border-dashed border-[rgba(0,0,0,0.08)] p-6 text-sm text-[#6b7280]">Loading categories...</div>
+          ) : error ? (
+            <div className="rounded-3xl border border-dashed border-[rgba(0,0,0,0.08)] p-6 text-sm text-[#f43f5e]">{error}</div>
+          ) : filteredCategories.length === 0 ? (
             <div className="rounded-3xl border border-[rgba(0,0,0,0.07)] bg-white p-12 text-center shadow-[0_12px_40px_rgba(10,13,20,0.05)]">
-              <div className="flex justify-center mb-4">
+              <div className="mb-4 flex justify-center">
                 <span className="text-5xl">📂</span>
               </div>
               <p className="text-lg font-semibold text-[#6b7280]">No Categories Found</p>
-              <p className="text-sm text-[#9ca3af] mt-2">Try adjusting your search query</p>
+              <p className="mt-2 text-sm text-[#9ca3af]">Try adjusting your search query</p>
             </div>
           ) : (
-            <article className="rounded-3xl border border-[rgba(0,0,0,0.07)] bg-white shadow-[0_12px_40px_rgba(10,13,20,0.05)] overflow-hidden">
+            <article className="overflow-hidden rounded-3xl border border-[rgba(0,0,0,0.07)] bg-white shadow-[0_12px_40px_rgba(10,13,20,0.05)]">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
-                  <thead className="bg-[#f4f6fb] border-b border-[rgba(0,0,0,0.07)]">
+                  <thead className="border-b border-[rgba(0,0,0,0.07)] bg-[#f4f6fb]">
                     <tr>
-                      <th className="px-4 py-4 font-semibold text-xs uppercase tracking-[0.16em] text-[#6b7280]">ID</th>
-                      <th className="px-4 py-4 font-semibold text-xs uppercase tracking-[0.16em] text-[#6b7280]">Category Name</th>
-                      <th className="px-4 py-4 font-semibold text-xs uppercase tracking-[0.16em] text-[#6b7280]">Description</th>
-                      <th className="px-4 py-4 font-semibold text-xs uppercase tracking-[0.16em] text-[#6b7280]">Products</th>
-                      <th className="px-4 py-4 font-semibold text-xs uppercase tracking-[0.16em] text-[#6b7280]">Actions</th>
+                      <th className="px-4 py-4 text-xs font-semibold uppercase tracking-[0.16em] text-[#6b7280]">ID</th>
+                      <th className="px-4 py-4 text-xs font-semibold uppercase tracking-[0.16em] text-[#6b7280]">Category Name</th>
+                      <th className="px-4 py-4 text-xs font-semibold uppercase tracking-[0.16em] text-[#6b7280]">Description</th>
+                      <th className="px-4 py-4 text-xs font-semibold uppercase tracking-[0.16em] text-[#6b7280]">Products</th>
+                      <th className="px-4 py-4 text-xs font-semibold uppercase tracking-[0.16em] text-[#6b7280]">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredCategories.map((category) => (
-                      <tr key={category.id} className="border-t border-[rgba(0,0,0,0.05)] hover:bg-[#f4f6fb]/50 transition">
+                      <tr key={category.id} className="border-t border-[rgba(0,0,0,0.05)] transition hover:bg-[#f4f6fb]/50">
                         <td className="px-4 py-4 font-medium text-[#4f6ef7]">{category.id}</td>
                         <td className="px-4 py-4 font-semibold text-[#0a0d14]">{category.name}</td>
-                        <td className="px-4 py-4 text-[#6b7280]">{category.description}</td>
+                        <td className="px-4 py-4 text-[#6b7280]">{category.description || '-'}</td>
                         <td className="px-4 py-4">
                           <span className="inline-flex rounded-full bg-[#0ec4a8]/10 px-3 py-1 text-xs font-semibold text-[#0ec4a8]">
                             {category.productCount} items
@@ -113,12 +280,18 @@ export default function CatalogPage() {
                         <td className="px-4 py-4">
                           <div className="flex items-center gap-2">
                             <button
-                              onClick={() => setSelectedCategory(category)}
-                              className="cursor-pointer inline-flex items-center gap-1 rounded-lg border border-[rgba(0,0,0,0.08)] bg-white px-2 py-1.5 text-xs font-medium text-[#2e3347] hover:border-[#4f6ef7] hover:text-[#4f6ef7] transition"
+                              onClick={() => {
+                                setSelectedCategory(category);
+                                setShowCategoryForm(true);
+                              }}
+                              className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-[rgba(0,0,0,0.08)] bg-white px-2 py-1.5 text-xs font-medium text-[#2e3347] transition hover:border-[#4f6ef7] hover:text-[#4f6ef7]"
                             >
                               ✏️ Edit
                             </button>
-                            <button className="cursor-pointer inline-flex items-center gap-1 rounded-lg border border-[rgba(0,0,0,0.08)] bg-white px-2 py-1.5 text-xs font-medium text-[#f43f5e] hover:bg-[#f43f5e]/10 transition">
+                            <button
+                              onClick={() => handleDeleteCategory(category)}
+                              className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-[rgba(0,0,0,0.08)] bg-white px-2 py-1.5 text-xs font-medium text-[#f43f5e] transition hover:bg-[#f43f5e]/10"
+                            >
                               🗑️ Delete
                             </button>
                           </div>
@@ -129,14 +302,24 @@ export default function CatalogPage() {
                 </table>
               </div>
 
-              {/* Table Footer */}
               <div className="border-t border-[rgba(0,0,0,0.07)] bg-[#f4f6fb] px-4 py-3 text-xs text-[#6b7280]">
-                Showing {filteredCategories.length} of {mockCategories.length} categories
+                Showing {filteredCategories.length} of {categories.length} categories
               </div>
             </article>
           )}
         </section>
       </div>
+
+      <CategoryModal
+        isOpen={showCategoryForm}
+        isEditMode={Boolean(selectedCategory)}
+        initialData={selectedCategory}
+        onClose={() => {
+          setShowCategoryForm(false);
+          setSelectedCategory(null);
+        }}
+        onSave={handleSaveCategory}
+      />
     </main>
   );
 }

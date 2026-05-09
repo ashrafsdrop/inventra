@@ -1,319 +1,314 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Sidebar from '../../dashboard/Sidebar';
-import SectionHeader from '../../dashboard/components/SectionHeader';
+import { useState, useEffect } from "react";
+import Sidebar from "../../dashboard/Sidebar";
 
-export default function SuppliersPage() {
-  const [showCreateSupplier, setShowCreateSupplier] = useState(false);
-  const [suppliers, setSuppliers] = useState([
-    { id: 1, name: 'Apple Inc.', email: 'contact@apple.com', phone: '+1 (800) 275-2273', address: '1 Apple Park Way', city: 'Cupertino', country: 'USA', paymentTerms: 'Net 30' },
-    { id: 2, name: 'HP Enterprise', email: 'sales@hpe.com', phone: '+1 (650) 857-1501', address: '1 HP Street', city: 'Palo Alto', country: 'USA', paymentTerms: 'Net 45' },
-    { id: 3, name: 'Dell Technologies', email: 'supplier@dell.com', phone: '+1 (800) 624-9897', address: 'One Dell Way', city: 'Round Rock', country: 'USA', paymentTerms: 'Net 30' },
-  ]);
+export default function Suppliers() {
+  const [suppliers, setSuppliers] = useState([]);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    address: '',
-    city: '',
-    country: '',
-    paymentTerms: '',
+    name: "",
+    email: "",
+    phone: "",
+    city: "",
+    country: "",
+    payment_terms: ""
   });
-  const [selectedSupplier, setSelectedSupplier] = useState('');
 
-  const handleInputChange = (field, value) => {
-    setFormData({ ...formData, [field]: value });
+  useEffect(() => {
+    fetchSuppliers();
+  }, []);
+
+  const fetchSuppliers = async () => {
+    try {
+      const res = await fetch("http://localhost:8000/api/suppliers/");
+      if (res.ok) {
+        const data = await res.json();
+        setSuppliers(data.results || data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch suppliers", err);
+    }
   };
 
-  const handleSubmit = () => {
-    if (!formData.name.trim()) {
-      alert('Please enter supplier name');
+  const handleCreateSupplier = async () => {
+    if (!formData.name) {
+      alert("Supplier name is required.");
       return;
     }
-    const newSupplier = {
-      id: suppliers.length + 1,
-      ...formData,
-    };
-    setSuppliers([...suppliers, newSupplier]);
-    setShowCreateSupplier(false);
-    setFormData({
-      name: '',
-      email: '',
-      phone: '',
-      address: '',
-      city: '',
-      country: '',
-      paymentTerms: '',
-    });
+    
+    try {
+      const res = await fetch("http://localhost:8000/api/suppliers/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(formData)
+      });
+      
+      if (res.ok) {
+        setFormData({
+          name: "",
+          email: "",
+          phone: "",
+          city: "",
+          country: "",
+          payment_terms: ""
+        });
+        setIsDrawerOpen(false);
+        fetchSuppliers();
+      } else {
+        const errorData = await res.json();
+        console.error("Failed to create supplier:", errorData);
+        alert("Failed to create supplier.");
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
+  const handleDeleteSupplier = async (id) => {
+    if (!confirm("Are you sure you want to delete this supplier?")) return;
+    try {
+      const res = await fetch(`http://localhost:8000/api/suppliers/${id}/`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        fetchSuppliers();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const filteredSuppliers = suppliers.filter(s => 
+    s.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    s.email?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
-    <main className="min-h-screen bg-[#f4f6fb] text-[#0a0d14]">
-      <Sidebar activeLabel="SUPPLIERS" />
+    <main className="min-h-screen bg-[#f4f6fb] text-[#0a0d14] flex overflow-hidden">
+      <Sidebar activeLabel="Purchase" activeSubLabel="SUPPLIERS" />
 
-      <div className="lg:pl-72">
-        <header className="sticky top-0 z-30 border-b border-[rgba(0,0,0,0.06)] bg-[#f4f6fb]/90 backdrop-blur-xl">
-          <div className="flex items-center justify-between gap-4 px-4 py-4 md:px-8">
-            <div>
-              <div className="lg:hidden flex items-center gap-2 font-['Syne',sans-serif] font-extrabold text-[20px] tracking-tight text-[#0a0d14]">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#4f6ef7]" />
-                Inventra
+      <div className="flex-1 lg:pl-72 flex flex-col h-screen relative">
+        {/* Header */}
+        <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-[rgba(0,0,0,0.06)] bg-[#f4f6fb]/90 px-8 py-6 backdrop-blur-xl">
+          <div>
+            <h1 className="text-2xl font-bold text-[#0a0d14]">Suppliers</h1>
+            <p className="text-sm text-gray-500 mt-1">Manage all your suppliers and vendors</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <input 
+                type="text" 
+                placeholder="Search suppliers..." 
+                className="w-64 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm outline-none focus:border-[#4f6ef7] focus:ring-1 focus:ring-[#4f6ef7]/50 shadow-sm"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               </div>
-              <h1 className="hidden lg:block font-['Poppins',sans-serif] text-2xl font-bold tracking-tight text-[#0a0d14]">Suppliers</h1>
-              <p className="hidden lg:block text-sm text-[#6b7280]">Manage all your suppliers and vendors</p>
             </div>
-
-            <div className="flex flex-1 items-center justify-end gap-3">
-              <label className="hidden md:flex min-w-[240px] max-w-[360px] flex-1 items-center gap-2 rounded-2xl border border-[rgba(0,0,0,0.08)] bg-white px-4 py-3 text-sm text-[#6b7280] shadow-sm">
-                <span>⌕</span>
-                <input className="w-full bg-transparent outline-none placeholder:text-[#9ca3af]" placeholder="Search suppliers..." />
-              </label>
-              <button className="hidden sm:inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-[rgba(0,0,0,0.08)] bg-white px-4 py-3 text-sm font-medium text-[#2e3347] shadow-sm transition duration-200 hover:border-[#4f6ef7] hover:text-[#4f6ef7] hover:scale-105 hover:shadow-md">
-                Columns
-              </button>
-              <button onClick={() => setShowCreateSupplier(true)} className="hidden sm:inline-flex cursor-pointer items-center gap-2 rounded-2xl border-none bg-[#4f6ef7] px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-[#4f6ef7]/25 transition duration-200 hover:bg-[#3d5ce6] hover:scale-105 hover:shadow-xl hover:shadow-[#4f6ef7]/35">
-                + Add Supplier
-              </button>
-            </div>
+            <button className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition">
+              Columns
+            </button>
+            <button 
+              onClick={() => setIsDrawerOpen(true)}
+              className="flex items-center gap-2 rounded-full bg-[#4f6ef7] px-5 py-2 text-sm font-bold text-white shadow-md shadow-[#4f6ef7]/20 transition hover:bg-[#3d5ce6]"
+            >
+              <span>+</span> Add Supplier
+            </button>
           </div>
         </header>
 
-        <section className="px-4 py-8 md:px-8">
-          {/* Supplier Selector */}
-          <div className="mb-8 rounded-3xl border border-[rgba(0,0,0,0.07)] bg-white p-6 shadow-[0_12px_40px_rgba(10,13,20,0.05)]">
+        {/* Content */}
+        <div className="flex-1 overflow-auto p-8 flex flex-col gap-6">
+          
+          {/* Select Supplier Card */}
+          <div className="rounded-3xl border border-[rgba(0,0,0,0.06)] bg-white p-6 shadow-sm">
             <h2 className="text-lg font-bold text-[#0a0d14] mb-4">Select Supplier</h2>
-            <div className="flex gap-4 items-end">
-              <div className="flex-1">
-                <label className="block text-sm font-semibold text-[#0a0d14] mb-2">Supplier</label>
-                <select
-                  value={selectedSupplier}
-                  onChange={(e) => setSelectedSupplier(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-[rgba(0,0,0,0.08)] focus:outline-none focus:border-[#4f6ef7] focus:ring-2 focus:ring-[#4f6ef7]/10 text-[#0a0d14]"
-                >
-                  <option value="">-- Select a supplier --</option>
-                  {suppliers.map((supplier) => (
-                    <option key={supplier.id} value={supplier.id}>
-                      {supplier.name}
-                    </option>
+            <div className="max-w-3xl">
+              <label className="block text-sm font-semibold text-[#0a0d14] mb-2">Supplier</label>
+              <div className="flex items-center gap-4">
+                <select className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#4f6ef7] focus:ring-1 focus:ring-[#4f6ef7]/50 text-gray-700 appearance-none shadow-sm cursor-pointer">
+                  <option>-- Select a supplier --</option>
+                  {suppliers.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
+                <button 
+                  onClick={() => setIsDrawerOpen(true)}
+                  className="whitespace-nowrap flex items-center gap-2 rounded-xl bg-[#4f6ef7] px-6 py-3 text-sm font-bold text-white shadow-md shadow-[#4f6ef7]/20 transition hover:bg-[#3d5ce6] cursor-pointer"
+                >
+                  <span>+</span> New Supplier
+                </button>
               </div>
-              <button
-                onClick={() => setShowCreateSupplier(true)}
-                className="px-4 py-3 rounded-xl bg-[#4f6ef7] text-white font-semibold hover:bg-[#3d5ce6] transition"
-              >
-                + New Supplier
-              </button>
             </div>
-
-            {/* Selected Supplier Details */}
-            {selectedSupplier && (
-              <div className="mt-6 pt-6 border-t border-[rgba(0,0,0,0.07)]">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {(() => {
-                    const supplier = suppliers.find((s) => s.id === parseInt(selectedSupplier));
-                    return supplier ? (
-                      <>
-                        <div>
-                          <p className="text-xs font-semibold text-[#6b7280] uppercase tracking-wide mb-1">Name</p>
-                          <p className="text-lg font-semibold text-[#0a0d14]">{supplier.name}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold text-[#6b7280] uppercase tracking-wide mb-1">Email</p>
-                          <p className="text-lg font-semibold text-[#0a0d14]">{supplier.email || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold text-[#6b7280] uppercase tracking-wide mb-1">Phone</p>
-                          <p className="text-lg font-semibold text-[#0a0d14]">{supplier.phone || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold text-[#6b7280] uppercase tracking-wide mb-1">Payment Terms</p>
-                          <p className="text-lg font-semibold text-[#0a0d14]">{supplier.paymentTerms || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold text-[#6b7280] uppercase tracking-wide mb-1">Address</p>
-                          <p className="text-lg font-semibold text-[#0a0d14]">{supplier.address || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold text-[#6b7280] uppercase tracking-wide mb-1">City, Country</p>
-                          <p className="text-lg font-semibold text-[#0a0d14]">{supplier.city}, {supplier.country}</p>
-                        </div>
-                      </>
-                    ) : null;
-                  })()}
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* All Suppliers Table */}
-          <article className="rounded-3xl border border-[rgba(0,0,0,0.07)] bg-white p-6 shadow-[0_12px_40px_rgba(10,13,20,0.05)]">
-            <SectionHeader
-              title="All Suppliers"
-              description="Complete list of all your suppliers and vendor information"
-              badge={`${suppliers.length} suppliers`}
-            />
+          {/* All Suppliers List */}
+          <div className="rounded-3xl border border-[rgba(0,0,0,0.06)] bg-white shadow-sm flex-1 flex flex-col min-h-[400px]">
+            <div className="p-6 border-b border-gray-50 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-[#0a0d14]">All Suppliers</h2>
+                <p className="text-sm text-gray-500 mt-1">Complete list of all your suppliers and vendor information</p>
+              </div>
+              <div className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+                {filteredSuppliers.length} suppliers
+              </div>
+            </div>
 
-            <div className="mt-6 overflow-x-auto">
-              <table className="w-full">
+            <div className="flex-1 p-6">
+              <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-[rgba(0,0,0,0.08)]">
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#2e3347] uppercase tracking-wide">Name</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#2e3347] uppercase tracking-wide">Email</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#2e3347] uppercase tracking-wide">Phone</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#2e3347] uppercase tracking-wide">City</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#2e3347] uppercase tracking-wide">Country</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#2e3347] uppercase tracking-wide">Payment Terms</th>
+                  <tr className="border-b border-gray-100 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                    <th className="pb-4 pr-4">NAME</th>
+                    <th className="pb-4 pr-4">EMAIL</th>
+                    <th className="pb-4 pr-4">PHONE</th>
+                    <th className="pb-4 pr-4">CITY</th>
+                    <th className="pb-4 pr-4">COUNTRY</th>
+                    <th className="pb-4 pr-4">PAYMENT TERMS</th>
+                    <th className="pb-4 text-right">ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {suppliers.length === 0 ? (
+                  {filteredSuppliers.length === 0 ? (
                     <tr>
-                      <td colSpan="6" className="px-4 py-12 text-center">
-                        <div className="flex flex-col items-center justify-center">
-                          <svg className="w-12 h-12 text-[#d1d5db] mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 8.048m-7.472 3.596a5.5 5.5 0 117.572 0m-7.572 0L9.88 9.88m6.24 6.24l2.12-2.12m0 0a5.5 5.5 0 117.572 0m-7.572 0l2.12 2.12" />
-                          </svg>
-                          <p className="text-[#6b7280] font-medium">No Suppliers Found</p>
-                          <p className="text-sm text-[#9ca3af]">Add a new supplier to get started</p>
-                        </div>
+                      <td colSpan="7" className="py-8 text-center text-gray-500">
+                        No suppliers found.
                       </td>
                     </tr>
                   ) : (
-                    suppliers.map((supplier) => (
-                      <tr key={supplier.id} className="border-t border-[rgba(0,0,0,0.05)] cursor-pointer transition hover:bg-[#f9fafb]">
-                        <td className="px-4 py-3 font-medium text-[#0a0d14]">{supplier.name}</td>
-                        <td className="px-4 py-3 text-[#6b7280]">{supplier.email}</td>
-                        <td className="px-4 py-3 text-[#6b7280]">{supplier.phone}</td>
-                        <td className="px-4 py-3 text-[#6b7280]">{supplier.city}</td>
-                        <td className="px-4 py-3 text-[#6b7280]">{supplier.country}</td>
-                        <td className="px-4 py-3 text-[#6b7280]">{supplier.paymentTerms}</td>
+                    filteredSuppliers.map((supplier) => (
+                      <tr key={supplier.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition">
+                        <td className="py-4 pr-4 text-sm font-medium text-[#0a0d14]">{supplier.name}</td>
+                        <td className="py-4 pr-4 text-sm text-gray-500">{supplier.email || "-"}</td>
+                        <td className="py-4 pr-4 text-sm text-gray-500">{supplier.phone || "-"}</td>
+                        <td className="py-4 pr-4 text-sm text-gray-500">{supplier.city || "-"}</td>
+                        <td className="py-4 pr-4 text-sm text-gray-500">{supplier.country || "-"}</td>
+                        <td className="py-4 pr-4 text-sm text-gray-500">{supplier.payment_terms || "-"}</td>
+                        <td className="py-4 text-right">
+                          <button 
+                            onClick={() => handleDeleteSupplier(supplier.id)}
+                            className="text-gray-400 hover:text-red-500 transition cursor-pointer"
+                            title="Delete"
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                          </button>
+                        </td>
                       </tr>
                     ))
                   )}
                 </tbody>
               </table>
             </div>
-          </article>
-        </section>
-      </div>
+          </div>
 
-      {/* Create Supplier Modal */}
-      {showCreateSupplier && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-[rgba(0,0,0,0.07)] px-6 py-4 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-[#0a0d14]">Add New Supplier</h2>
-              <button onClick={() => setShowCreateSupplier(false)} className="text-[#6b7280] hover:text-[#0a0d14] text-2xl">×</button>
+        </div>
+
+        {/* Overlay Background */}
+        {isDrawerOpen && (
+          <div 
+            className="absolute inset-0 bg-gray-900/40 z-40 backdrop-blur-[2px] transition-opacity" 
+            onClick={() => setIsDrawerOpen(false)}
+          />
+        )}
+
+        {/* Create Supplier Drawer */}
+        <div className={`absolute top-0 right-0 h-full w-[400px] bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out flex flex-col ${isDrawerOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+          <div className="flex items-center gap-4 border-b border-gray-100 p-6">
+            <button 
+              onClick={() => setIsDrawerOpen(false)}
+              className="text-gray-400 hover:text-gray-700 transition cursor-pointer"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+            <h2 className="text-lg font-bold text-[#0a0d14]">Add New Supplier</h2>
+          </div>
+
+          <div className="flex-1 overflow-auto p-6 space-y-5">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Supplier Name *</label>
+              <input 
+                type="text" 
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none focus:border-[#4f6ef7] focus:ring-1 focus:ring-[#4f6ef7]/50" 
+                placeholder="e.g. Apple Inc."
+                value={formData.name}
+                onChange={(e) => setFormData({...formData, name: e.target.value})}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
+              <input 
+                type="email" 
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none focus:border-[#4f6ef7] focus:ring-1 focus:ring-[#4f6ef7]/50" 
+                placeholder="contact@apple.com"
+                value={formData.email}
+                onChange={(e) => setFormData({...formData, email: e.target.value})}
+              />
             </div>
 
-            <div className="p-6 space-y-4">
-              {/* Basic Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-[#0a0d14] mb-2">
-                    Supplier Name <span className="text-[#f43f5e]">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Enter supplier name"
-                    className="w-full px-3 py-2 rounded-xl border border-[rgba(0,0,0,0.08)] focus:outline-none focus:border-[#4f6ef7]"
-                    value={formData.name}
-                    onChange={(e) => handleInputChange('name', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-[#0a0d14] mb-2">Email</label>
-                  <input
-                    type="email"
-                    placeholder="Enter email"
-                    className="w-full px-3 py-2 rounded-xl border border-[rgba(0,0,0,0.08)] focus:outline-none focus:border-[#4f6ef7]"
-                    value={formData.email}
-                    onChange={(e) => handleInputChange('email', e.target.value)}
-                  />
-                </div>
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone</label>
+              <input 
+                type="text" 
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none focus:border-[#4f6ef7] focus:ring-1 focus:ring-[#4f6ef7]/50" 
+                placeholder="+1 (800) 275-2273"
+                value={formData.phone}
+                onChange={(e) => setFormData({...formData, phone: e.target.value})}
+              />
+            </div>
 
-              {/* Contact Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-[#0a0d14] mb-2">Phone</label>
-                  <input
-                    type="tel"
-                    placeholder="Enter phone number"
-                    className="w-full px-3 py-2 rounded-xl border border-[rgba(0,0,0,0.08)] focus:outline-none focus:border-[#4f6ef7]"
-                    value={formData.phone}
-                    onChange={(e) => handleInputChange('phone', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-[#0a0d14] mb-2">Payment Terms</label>
-                  <input
-                    type="text"
-                    placeholder="e.g., Net 30"
-                    className="w-full px-3 py-2 rounded-xl border border-[rgba(0,0,0,0.08)] focus:outline-none focus:border-[#4f6ef7]"
-                    value={formData.paymentTerms}
-                    onChange={(e) => handleInputChange('paymentTerms', e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* Address Info */}
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-[#0a0d14] mb-2">Address</label>
-                <input
-                  type="text"
-                  placeholder="Enter street address"
-                  className="w-full px-3 py-2 rounded-xl border border-[rgba(0,0,0,0.08)] focus:outline-none focus:border-[#4f6ef7]"
-                  value={formData.address}
-                  onChange={(e) => handleInputChange('address', e.target.value)}
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">City</label>
+                <input 
+                  type="text" 
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none focus:border-[#4f6ef7] focus:ring-1 focus:ring-[#4f6ef7]/50" 
+                  placeholder="Cupertino"
+                  value={formData.city}
+                  onChange={(e) => setFormData({...formData, city: e.target.value})}
                 />
               </div>
-
-              {/* City & Country */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-[#0a0d14] mb-2">City</label>
-                  <input
-                    type="text"
-                    placeholder="Enter city"
-                    className="w-full px-3 py-2 rounded-xl border border-[rgba(0,0,0,0.08)] focus:outline-none focus:border-[#4f6ef7]"
-                    value={formData.city}
-                    onChange={(e) => handleInputChange('city', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-[#0a0d14] mb-2">Country</label>
-                  <input
-                    type="text"
-                    placeholder="Enter country"
-                    className="w-full px-3 py-2 rounded-xl border border-[rgba(0,0,0,0.08)] focus:outline-none focus:border-[#4f6ef7]"
-                    value={formData.country}
-                    onChange={(e) => handleInputChange('country', e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-3 justify-end pt-4 border-t border-[rgba(0,0,0,0.07)]">
-                <button
-                  onClick={() => setShowCreateSupplier(false)}
-                  className="px-4 py-2 rounded-xl border border-[rgba(0,0,0,0.08)] text-[#2e3347] font-medium hover:bg-[#f9fafb] transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSubmit}
-                  className="px-4 py-2 rounded-xl bg-[#4f6ef7] text-white font-semibold hover:bg-[#3d5ce6] transition"
-                >
-                  Add Supplier
-                </button>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Country</label>
+                <input 
+                  type="text" 
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none focus:border-[#4f6ef7] focus:ring-1 focus:ring-[#4f6ef7]/50" 
+                  placeholder="USA"
+                  value={formData.country}
+                  onChange={(e) => setFormData({...formData, country: e.target.value})}
+                />
               </div>
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Payment Terms</label>
+              <input 
+                type="text" 
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none focus:border-[#4f6ef7] focus:ring-1 focus:ring-[#4f6ef7]/50" 
+                placeholder="e.g. Net 30"
+                value={formData.payment_terms}
+                onChange={(e) => setFormData({...formData, payment_terms: e.target.value})}
+              />
+            </div>
+          </div>
+
+          <div className="p-6 border-t border-gray-100 bg-white">
+            <button 
+              onClick={handleCreateSupplier}
+              className="w-full rounded-xl bg-[#4f6ef7] py-3.5 text-base font-bold text-white shadow-lg shadow-[#4f6ef7]/25 transition hover:bg-[#3d5ce6] cursor-pointer"
+            >
+              Save Supplier
+            </button>
           </div>
         </div>
-      )}
+
+      </div>
     </main>
   );
 }

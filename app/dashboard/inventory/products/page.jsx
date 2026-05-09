@@ -37,6 +37,75 @@ const initialSubcategories = [
 // products will be loaded from the backend
 const mockProducts = [];
 
+function getImageUrl(imagePath) {
+  if (!imagePath) return null;
+  if (/^https?:\/\//i.test(imagePath)) return imagePath;
+  return `${API_BASE}${imagePath.startsWith('/') ? '' : '/'}${imagePath}`;
+}
+
+function createEmptyProductForm() {
+  return {
+    name: '',
+    category: '',
+    brand: '',
+    subCategory: '',
+    sku: '',
+    purchasePrice: '',
+    salePrice: '',
+    vat: '',
+    quantity: '',
+    uom: 'Unit',
+    reorderQty: '',
+    description: '',
+    image: null,
+    imagePreview: null,
+  };
+}
+
+function createProductForm(product) {
+  if (!product) return createEmptyProductForm();
+
+  return {
+    name: product.name || '',
+    category: product.categoryId || '',
+    brand: product.brandId || '',
+    subCategory: product.subcategoryId || '',
+    sku: product.sku || '',
+    purchasePrice: product.purchasePrice ?? '',
+    salePrice: product.salePrice ?? '',
+    vat: product.vat ?? '',
+    quantity: product.quantity ?? '',
+    uom: product.uom || 'Unit',
+    reorderQty: product.reorderQty ?? '',
+    description: product.description || '',
+    image: null,
+    imagePreview: product.imageUrl || null,
+  };
+}
+
+function buildProductPayload(formData) {
+  const payload = new FormData();
+
+  payload.append('name', formData.name || '');
+  payload.append('sku', formData.sku || '');
+  payload.append('category', formData.category || '');
+  if (formData.brand) payload.append('brand', formData.brand);
+  if (formData.subCategory) payload.append('subcategory', formData.subCategory);
+  payload.append('purchase_price', String(formData.purchasePrice || 0));
+  payload.append('sale_price', String(formData.salePrice || 0));
+  payload.append('tax', String(formData.vat || 0));
+  payload.append('quantity', String(formData.quantity || 0));
+  payload.append('reorder_qty', String(formData.reorderQty || 0));
+  payload.append('unit_of_measure', formData.uom || 'Unit');
+  payload.append('description', formData.description || '');
+
+  if (formData.image instanceof File) {
+    payload.append('image', formData.image);
+  }
+
+  return payload;
+}
+
 const allColumns = [
   { id: 'id', label: 'ID', visible: true },
   { id: 'image', label: 'IMAGE', visible: true },
@@ -68,23 +137,16 @@ function StockBadge({ quantity, reorderQty }) {
 }
 
 // Add Product Modal Component
-function AddProductModal({ isOpen, onClose, onSave, categories, brands, subcategories, onOpenCategoryModal, onOpenBrandModal, onOpenSubcategoryModal }) {
-  const [formData, setFormData] = useState({
-    name: '',
-    category: '',
-    brand: '',
-    subCategory: '',
-    sku: '',
-    purchasePrice: '',
-    salePrice: '',
-    vat: '',
-    quantity: '',
-    uom: 'Unit',
-    reorderQty: '',
-    description: '',
-    image: null,
-    imagePreview: null,
-  });
+function AddProductModal({ isOpen, isEditMode, initialData, onClose, onSave, categories, brands, subcategories, onOpenCategoryModal, onOpenBrandModal, onOpenSubcategoryModal }) {
+  const [formData, setFormData] = useState(() => createProductForm(initialData));
+
+  useEffect(() => {
+    if (isOpen) {
+      queueMicrotask(() => {
+        setFormData(createProductForm(initialData));
+      });
+    }
+  }, [isOpen, initialData]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -114,29 +176,13 @@ function AddProductModal({ isOpen, onClose, onSave, categories, brands, subcateg
     }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.name || !formData.sku || !formData.category) {
       alert('Please fill in required fields: Name, SKU, and Category');
       return;
     }
-    onSave(formData);
-    setFormData({
-      name: '',
-      category: '',
-      brand: '',
-      subCategory: '',
-      sku: '',
-      purchasePrice: '',
-      salePrice: '',
-      vat: '',
-      quantity: '',
-      uom: 'Unit',
-      reorderQty: '',
-      description: '',
-      image: null,
-      imagePreview: null,
-    });
-    onClose();
+    await onSave(formData);
+    setFormData(createEmptyProductForm());
   };
 
   if (!isOpen) return null;
@@ -146,7 +192,7 @@ function AddProductModal({ isOpen, onClose, onSave, categories, brands, subcateg
       <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white shadow-2xl [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         {/* Modal Header */}
         <div className="sticky top-0 flex items-center justify-between border-b border-[rgba(0,0,0,0.07)] bg-white px-6 py-4">
-          <h2 className="text-lg font-bold text-[#0a0d14]">Create Product</h2>
+          <h2 className="text-lg font-bold text-[#0a0d14]">{isEditMode ? 'Edit Product' : 'Create Product'}</h2>
           <button onClick={onClose} className="cursor-pointer text-[#6b7280] hover:text-[#0a0d14]">
             ✕
           </button>
@@ -415,7 +461,7 @@ function AddProductModal({ isOpen, onClose, onSave, categories, brands, subcateg
             onClick={handleSave}
             className="cursor-pointer flex-1 rounded-2xl border-none bg-[#4f6ef7] px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-[#4f6ef7]/25 transition hover:bg-[#3d5ce6]"
           >
-            Create Product
+            {isEditMode ? 'Update Product' : 'Create Product'}
           </button>
         </div>
       </div>
@@ -624,20 +670,53 @@ export default function ProductsPage() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let mounted = true;
     const load = async () => {
+      setLoading(true);
+      setError('');
       try {
-        const data = await apiFetch('/api/inventory/products/');
-        // data may be paginated or a list; handle common DRF responses
-        const list = Array.isArray(data) ? data : data.results || [];
+        const [productData, categoryData, brandData, subcategoryData] = await Promise.all([
+          apiFetch('/api/inventory/products/'),
+          apiFetch('/api/inventory/categories/'),
+          apiFetch('/api/inventory/brands/'),
+          apiFetch('/api/inventory/subcategories/'),
+        ]);
+
+        const list = Array.isArray(productData) ? productData : productData.results || [];
+        const categoriesList = Array.isArray(categoryData) ? categoryData : categoryData.results || [];
+        const brandsList = Array.isArray(brandData) ? brandData : brandData.results || [];
+        const subcategoriesList = Array.isArray(subcategoryData) ? subcategoryData : subcategoryData.results || [];
+
+        if (mounted) {
+          setCategories(
+            categoriesList.length
+              ? categoriesList.map((item) => ({ id: item.id, name: item.name }))
+              : initialCategories
+          );
+          setBrands(
+            brandsList.length ? brandsList.map((item) => ({ id: item.id, name: item.name })) : initialBrands
+          );
+          setSubcategories(
+            subcategoriesList.length
+              ? subcategoriesList.map((item) => ({ id: item.id, name: item.name }))
+              : initialSubcategories
+          );
+        }
+
         const normalized = list.map((p) => ({
           id: p.id || p.sku,
           image: p.image || null,
+          imageUrl: getImageUrl(p.image),
           name: p.name,
-          brand: p.brand_name || (p.brand && p.brand.name) || '',
-          subCategory: p.subcategory_name || (p.subcategory && p.subcategory.name) || '',
+          categoryId: p.category || '',
+          brandId: p.brand || '',
+          subcategoryId: p.subcategory || '',
+          category: p.category_name || '',
+          brand: p.brand_name || '',
+          subCategory: p.subcategory_name || '',
           sku: p.sku,
           purchasePrice: p.purchase_price,
           vat: p.tax || 0,
@@ -645,6 +724,7 @@ export default function ProductsPage() {
           quantity: p.quantity,
           uom: p.unit_of_measure || 'Unit',
           reorderQty: p.reorder_qty,
+          description: p.description || '',
         }));
         if (mounted) setProducts(normalized);
       } catch (err) {
@@ -657,7 +737,7 @@ export default function ProductsPage() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [reloadKey]);
 
   // Filter products based on search query
   const filteredProducts = useMemo(() => {
@@ -678,10 +758,24 @@ export default function ProductsPage() {
     );
   };
 
-  const handleAddProduct = (formData) => {
-    console.log('New product:', formData);
-    alert('Product created successfully!');
-    // Product would be saved to database here
+  const handleAddProduct = async (formData) => {
+    const isEditMode = Boolean(selectedProduct);
+    const endpoint = isEditMode ? `/api/inventory/products/${selectedProduct.id}/` : '/api/inventory/products/';
+    const method = isEditMode ? 'PATCH' : 'POST';
+
+    try {
+      await apiFetch(endpoint, {
+        method,
+        body: buildProductPayload(formData),
+      });
+      alert(isEditMode ? 'Product updated successfully!' : 'Product created successfully!');
+      setShowAddForm(false);
+      setSelectedProduct(null);
+      setReloadKey((value) => value + 1);
+    } catch (err) {
+      alert(err.message || 'Failed to save product');
+      throw err;
+    }
   };
 
   const handleAddCategory = (categoryName) => {
@@ -711,6 +805,24 @@ export default function ProductsPage() {
     alert('Sub Category created successfully!');
   };
 
+  const handleDeleteProduct = async (product) => {
+    const confirmed = window.confirm(`Delete ${product.name}? This cannot be undone.`);
+    if (!confirmed) return;
+
+    try {
+      await apiFetch(`/api/inventory/products/${product.id}/`, {
+        method: 'DELETE',
+      });
+      alert('Product deleted successfully!');
+      setReloadKey((value) => value + 1);
+      if (selectedProduct?.id === product.id) {
+        setSelectedProduct(null);
+      }
+    } catch (err) {
+      alert(err.message || 'Failed to delete product');
+    }
+  };
+
   const visibleColsArray = visibleColumns.filter((col) => col.visible);
 
   return (
@@ -734,7 +846,10 @@ export default function ProductsPage() {
                 ⬇️ Download CSV
               </button>
               <button
-                onClick={() => setShowAddForm(true)}
+                onClick={() => {
+                  setSelectedProduct(null);
+                  setShowAddForm(true);
+                }}
                 className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border-none bg-[#4f6ef7] px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-[#4f6ef7]/25 transition hover:bg-[#3d5ce6]"
               >
                 ➕ Create Product
@@ -797,6 +912,8 @@ export default function ProductsPage() {
         <section className="px-4 py-6 md:px-8">
           {loading ? (
             <div className="rounded-3xl border border-dashed border-[rgba(0,0,0,0.08)] p-6 text-sm text-[#6b7280]">Loading products...</div>
+          ) : error ? (
+            <div className="rounded-3xl border border-dashed border-[rgba(0,0,0,0.08)] p-6 text-sm text-[#f43f5e]">{error}</div>
           ) : filteredProducts.length === 0 ? (
             <div className="rounded-3xl border border-[rgba(0,0,0,0.07)] bg-white p-12 text-center shadow-[0_12px_40px_rgba(10,13,20,0.05)]">
               <div className="flex justify-center mb-4">
@@ -851,12 +968,18 @@ export default function ProductsPage() {
                         <td className="px-4 py-4">
                           <div className="flex items-center gap-2">
                             <button
-                              onClick={() => setSelectedProduct(product)}
+                              onClick={() => {
+                                setSelectedProduct(product);
+                                setShowAddForm(true);
+                              }}
                               className="cursor-pointer inline-flex items-center gap-1 rounded-lg border border-[rgba(0,0,0,0.08)] bg-white px-2 py-1.5 text-xs font-medium text-[#2e3347] hover:border-[#4f6ef7] hover:text-[#4f6ef7] transition"
                             >
                               ✏️ Edit
                             </button>
-                            <button className="cursor-pointer inline-flex items-center gap-1 rounded-lg border border-[rgba(0,0,0,0.08)] bg-white px-2 py-1.5 text-xs font-medium text-[#f43f5e] hover:bg-[#f43f5e]/10 transition">
+                            <button
+                              onClick={() => handleDeleteProduct(product)}
+                              className="cursor-pointer inline-flex items-center gap-1 rounded-lg border border-[rgba(0,0,0,0.08)] bg-white px-2 py-1.5 text-xs font-medium text-[#f43f5e] hover:bg-[#f43f5e]/10 transition"
+                            >
                               🗑️ Delete
                             </button>
                           </div>
@@ -879,7 +1002,12 @@ export default function ProductsPage() {
       {/* Add Product Modal */}
       <AddProductModal
         isOpen={showAddForm}
-        onClose={() => setShowAddForm(false)}
+        isEditMode={Boolean(selectedProduct)}
+        initialData={selectedProduct}
+        onClose={() => {
+          setShowAddForm(false);
+          setSelectedProduct(null);
+        }}
         onSave={handleAddProduct}
         categories={categories}
         brands={brands}

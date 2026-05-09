@@ -1,42 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Sidebar from "../Sidebar";
-
-const initialCustomers = [
-  {
-    id: "CUST-1001",
-    username: "Apple Inc.",
-    email: "accounts@apple.com",
-    phone: "+1 (800) 275-2273",
-    address: "1 Apple Park Way, Cupertino, CA",
-    sales: 2450000,
-  },
-  {
-    id: "CUST-1002",
-    username: "HP Enterprise",
-    email: "billing@hpe.com",
-    phone: "+1 (650) 857-1501",
-    address: "1701 E Mossy Oaks Rd, Spring, TX",
-    sales: 1870000,
-  },
-  {
-    id: "CUST-1003",
-    username: "Microsoft Corp",
-    email: "finance@microsoft.com",
-    phone: "+1 (425) 882-8080",
-    address: "1 Microsoft Way, Redmond, WA",
-    sales: 1350000,
-  },
-  {
-    id: "CUST-1004",
-    username: "Dell Technologies",
-    email: "procurement@dell.com",
-    phone: "+1 (800) 624-9897",
-    address: "One Dell Way, Round Rock, TX",
-    sales: 1120000,
-  },
-];
 
 const currencyFormatter = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -46,26 +11,43 @@ const currencyFormatter = new Intl.NumberFormat("en-GB", {
 
 const emptyForm = {
   id: "",
-  username: "",
+  name: "",
   email: "",
   phone: "",
   address: "",
-  sales: "",
 };
 
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState(initialCustomers);
+  const [customers, setCustomers] = useState([]);
   const [search, setSearch] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingCustomerId, setEditingCustomerId] = useState(null);
   const [formData, setFormData] = useState(emptyForm);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchCustomers();
+  }, []);
+
+  const fetchCustomers = async () => {
+    try {
+      const res = await fetch("http://localhost:8000/api/customers/");
+      const data = await res.json();
+      const customerList = data.results || data;
+      setCustomers(customerList);
+    } catch (err) {
+      console.error("Failed to fetch customers", err);
+      alert("Failed to load customers");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const stats = useMemo(() => {
-    const totalSales = customers.reduce((sum, customer) => sum + customer.sales, 0);
     return {
       totalCustomers: customers.length,
-      totalSales,
-      averageSales: customers.length ? totalSales / customers.length : 0,
+      totalSales: 0,
+      averageSales: 0,
     };
   }, [customers]);
 
@@ -74,8 +56,8 @@ export default function CustomersPage() {
 
     return customers.filter((customer) => {
       if (!normalizedSearch) return true;
-      return [customer.id, customer.username, customer.email, customer.phone].some((value) =>
-        value.toLowerCase().includes(normalizedSearch)
+      return [customer.id, customer.name, customer.email, customer.phone].some((value) =>
+        String(value).toLowerCase().includes(normalizedSearch)
       );
     });
   }, [customers, search]);
@@ -94,37 +76,73 @@ export default function CustomersPage() {
     setEditingCustomerId(customer.id);
     setFormData({
       id: customer.id,
-      username: customer.username,
+      name: customer.name,
       email: customer.email,
       phone: customer.phone,
       address: customer.address,
-      sales: String(customer.sales),
     });
     setIsFormOpen(true);
   };
 
-  const saveCustomer = () => {
-    const nextCustomer = {
-      id: formData.id || `CUST-${String(customers.length + 1001).padStart(4, "0")}`,
-      username: formData.username,
-      email: formData.email,
-      phone: formData.phone,
-      address: formData.address,
-      sales: Number(formData.sales || 0),
-    };
+  const saveCustomer = async () => {
+    if (!formData.name || !formData.email) {
+      alert("Name and email are required");
+      return;
+    }
 
-    setCustomers((current) =>
-      editingCustomerId
-        ? current.map((customer) => (customer.id === editingCustomerId ? nextCustomer : customer))
-        : [nextCustomer, ...current]
-    );
+    try {
+      const isEditing = !!editingCustomerId;
+      const url = isEditing
+        ? `http://localhost:8000/api/customers/${editingCustomerId}/`
+        : "http://localhost:8000/api/customers/";
 
-    setIsFormOpen(false);
-    resetForm();
+      const payload = {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone || "",
+        address: formData.address || "",
+        username: formData.name.toLowerCase().replace(/\s+/g, "_"),
+      };
+
+      const res = await fetch(url, {
+        method: isEditing ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        alert(`Customer ${isEditing ? "updated" : "created"} successfully!`);
+        setIsFormOpen(false);
+        resetForm();
+        fetchCustomers();
+      } else {
+        const error = await res.json();
+        alert(`Error: ${JSON.stringify(error)}`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert(`Error: ${err.message}`);
+    }
   };
 
-  const deleteCustomer = (customerId) => {
-    setCustomers((current) => current.filter((customer) => customer.id !== customerId));
+  const deleteCustomer = async (customerId) => {
+    if (!confirm("Are you sure you want to delete this customer?")) return;
+
+    try {
+      const res = await fetch(`http://localhost:8000/api/customers/${customerId}/`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        alert("Customer deleted successfully!");
+        fetchCustomers();
+      } else {
+        alert("Failed to delete customer");
+      }
+    } catch (err) {
+      console.error(err);
+      alert(`Error: ${err.message}`);
+    }
   };
 
   return (
@@ -229,18 +247,17 @@ export default function CustomersPage() {
                 <thead className="bg-white text-xs uppercase tracking-[0.16em] text-[#6b7280]">
                   <tr className="border-b border-[rgba(0,0,0,0.06)]">
                     <th className="px-4 py-4 font-semibold">ID</th>
-                    <th className="px-4 py-4 font-semibold">Username</th>
+                    <th className="px-4 py-4 font-semibold">Name</th>
                     <th className="px-4 py-4 font-semibold">Email</th>
                     <th className="px-4 py-4 font-semibold">Phone</th>
                     <th className="px-4 py-4 font-semibold">Address</th>
-                    <th className="px-4 py-4 font-semibold">Sales</th>
                     <th className="px-4 py-4 font-semibold text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredCustomers.length === 0 ? (
                     <tr>
-                      <td colSpan="7" className="px-4 py-20">
+                      <td colSpan="6" className="px-4 py-20">
                         <div className="flex flex-col items-center justify-center text-center text-[#9aa3b2]">
                           <div className="mb-3 text-[#c9d2e1]">
                             <svg className="h-14 w-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
@@ -257,11 +274,10 @@ export default function CustomersPage() {
                     filteredCustomers.map((customer) => (
                       <tr key={customer.id} className="border-t border-[rgba(0,0,0,0.04)] text-sm hover:bg-[#f9fafb]">
                         <td className="px-4 py-4 font-medium text-[#0a0d14]">{customer.id}</td>
-                        <td className="px-4 py-4 text-[#2e3347]">{customer.username}</td>
+                        <td className="px-4 py-4 text-[#2e3347]">{customer.name}</td>
                         <td className="px-4 py-4 text-[#2e3347]">{customer.email}</td>
                         <td className="px-4 py-4 text-[#2e3347]">{customer.phone}</td>
                         <td className="px-4 py-4 text-[#2e3347]">{customer.address}</td>
-                        <td className="px-4 py-4 font-semibold text-[#4f6ef7]">{currencyFormatter.format(customer.sales)}</td>
                         <td className="px-4 py-4">
                           <div className="flex items-center justify-end gap-2">
                             <button onClick={() => openEditForm(customer)} className="rounded-xl border border-[rgba(0,0,0,0.08)] bg-white px-3 py-2 text-xs font-semibold text-[#2e3347] shadow-sm transition hover:border-[#4f6ef7] hover:text-[#4f6ef7]">
@@ -299,18 +315,18 @@ export default function CustomersPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="space-y-1 text-sm font-medium text-[#2e3347]">
                   Customer ID
-                  <input value={formData.id} onChange={(event) => setFormData((current) => ({ ...current, id: event.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:border-[#4f6ef7]" placeholder="CUST-1005" />
+                  <input disabled value={formData.id} className="w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2.5 outline-none text-gray-500" placeholder="Auto-generated" />
                 </label>
                 <label className="space-y-1 text-sm font-medium text-[#2e3347]">
-                  Username
-                  <input value={formData.username} onChange={(event) => setFormData((current) => ({ ...current, username: event.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:border-[#4f6ef7]" />
+                  Name
+                  <input value={formData.name} onChange={(event) => setFormData((current) => ({ ...current, name: event.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:border-[#4f6ef7]" placeholder="Company Name" required />
                 </label>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="space-y-1 text-sm font-medium text-[#2e3347]">
                   Email
-                  <input value={formData.email} onChange={(event) => setFormData((current) => ({ ...current, email: event.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:border-[#4f6ef7]" />
+                  <input type="email" value={formData.email} onChange={(event) => setFormData((current) => ({ ...current, email: event.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:border-[#4f6ef7]" required />
                 </label>
                 <label className="space-y-1 text-sm font-medium text-[#2e3347]">
                   Phone
@@ -321,11 +337,6 @@ export default function CustomersPage() {
               <label className="space-y-1 text-sm font-medium text-[#2e3347]">
                 Address
                 <input value={formData.address} onChange={(event) => setFormData((current) => ({ ...current, address: event.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:border-[#4f6ef7]" />
-              </label>
-
-              <label className="space-y-1 text-sm font-medium text-[#2e3347]">
-                Sales
-                <input type="number" value={formData.sales} onChange={(event) => setFormData((current) => ({ ...current, sales: event.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:border-[#4f6ef7]" />
               </label>
 
               <div className="flex gap-3 pt-2">

@@ -10,7 +10,7 @@ django.setup()
 from accounts.models import User
 from customers.models import Customer
 from inventory.models import Brand, Category, Product, StockMovement, Subcategory
-from purchases.models import PurchaseInvoice, PurchaseInvoiceItem
+from purchases.models import PurchaseInvoice, PurchaseInvoiceItem, PurchaseOrder, PurchaseOrderItem
 from sales.models import Payment, SaleInvoice, SaleInvoiceItem, SaleReturn, SaleReturnItem
 from suppliers.models import Supplier
 
@@ -245,6 +245,46 @@ def run():
                     'selling_price': float(purchase_price) * 1.5,
                     'tax': 0.00,
                     'line_total': quantity * purchase_price,
+                },
+            )
+
+    # Create some PurchaseOrder seed data (so frontend has orders to display)
+    purchase_orders = [
+        (suppliers['Tech Supplier Inc'], this_month, 2300.00, 'SENT'),
+        (suppliers['Global Imports'], last_month, 1200.00, 'RECEIVED'),
+        (suppliers['Office Essentials Co'], two_months_ago, 480.00, 'DRAFT'),
+    ]
+
+    purchase_order_items = {
+        0: [(p3, 2, 650.00), (p7, 1, 180.00)],
+        1: [(p6, 10, 95.00), (p8, 20, 15.00)],
+        2: [(p2, 4, 50.00)],
+    }
+
+    created_purchase_orders = []
+    for idx, (supplier, order_date, total_amount, status) in enumerate(purchase_orders):
+        order, _ = PurchaseOrder.objects.update_or_create(
+            supplier=supplier,
+            order_date=order_date,
+            defaults={
+                'total_amount': total_amount,
+                'status': status,
+                'notes': 'Seed data purchase order',
+            },
+        )
+        created_purchase_orders.append(order)
+
+    for idx, rows in purchase_order_items.items():
+        order = created_purchase_orders[idx]
+        for product, quantity, price in rows:
+            PurchaseOrderItem.objects.update_or_create(
+                purchase_order=order,
+                product=product,
+                defaults={
+                    'quantity': quantity,
+                    'purchase_price': price,
+                    'tax': 0.00,
+                    'line_total': quantity * price,
                 },
             )
 

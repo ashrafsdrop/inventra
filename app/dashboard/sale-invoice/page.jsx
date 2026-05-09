@@ -1,61 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Sidebar from "../Sidebar";
-
-const initialInvoices = [
-  {
-    id: "INV-10428",
-    date: "2026-05-01",
-    customer: "Apple Inc.",
-    totalAmount: 245000,
-    paid: 200000,
-    due: 45000,
-    tax: 12250,
-    dueDate: "2026-05-15",
-    profit: 38000,
-    salePerson: "Ayesha Khan",
-  },
-  {
-    id: "INV-10429",
-    date: "2026-05-02",
-    customer: "HP Enterprise",
-    totalAmount: 187000,
-    paid: 150000,
-    due: 37000,
-    tax: 9350,
-    dueDate: "2026-05-17",
-    profit: 29500,
-    salePerson: "Daniel Roberts",
-  },
-  {
-    id: "INV-10430",
-    date: "2026-05-03",
-    customer: "Microsoft Corp",
-    totalAmount: 135000,
-    paid: 135000,
-    due: 0,
-    tax: 6750,
-    dueDate: "2026-05-18",
-    profit: 21600,
-    salePerson: "Maya Singh",
-  },
-  {
-    id: "INV-10431",
-    date: "2026-05-04",
-    customer: "IKEA Systems",
-    totalAmount: 62000,
-    paid: 42000,
-    due: 20000,
-    tax: 3100,
-    dueDate: "2026-05-20",
-    profit: 8400,
-    salePerson: "Ayesha Khan",
-  },
-];
-
-const customerOptions = ["Apple Inc.", "HP Enterprise", "Microsoft Corp", "Dell Technologies", "IKEA Systems"];
-const salesPersonOptions = ["Ayesha Khan", "Daniel Roberts", "Maya Singh"];
 
 const currencyFormatter = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -65,58 +11,127 @@ const currencyFormatter = new Intl.NumberFormat("en-GB", {
 
 const emptyForm = {
   id: "",
-  date: "2026-05-04",
-  customer: customerOptions[0],
-  totalAmount: "",
-  paid: "",
-  due: "",
-  tax: "",
-  dueDate: "",
+  invoice_number: "",
+  invoice_date: "",
+  customer: "",
+  total_amount: "",
+  paid_amount: "",
+  due_amount: "",
+  total_tax: "",
+  due_date: "",
   profit: "",
-  salePerson: salesPersonOptions[0],
+  sales_person: "",
 };
 
 export default function SaleInvoicePage() {
-  const [invoices, setInvoices] = useState(initialInvoices);
+  const [invoices, setInvoices] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
-  const [startDate, setStartDate] = useState("2026-05-01");
-  const [endDate, setEndDate] = useState("2026-05-31");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingInvoiceId, setEditingInvoiceId] = useState(null);
   const [formData, setFormData] = useState(emptyForm);
+  const [lineItems, setLineItems] = useState([]);
+
+  useEffect(() => {
+    fetchInvoices();
+    fetchCustomers();
+    fetchProducts();
+  }, []);
+
+  const fetchInvoices = async () => {
+    try {
+      const res = await fetch("http://localhost:8000/api/sales/invoices/");
+      const data = await res.json();
+      setInvoices(data.results || data);
+    } catch (err) {
+      console.error("Failed to fetch invoices", err);
+    }
+  };
+
+  const fetchCustomers = async () => {
+    try {
+      const res = await fetch("http://localhost:8000/api/customers/");
+      const data = await res.json();
+      setCustomers(data.results || data);
+    } catch (err) {
+      console.error("Failed to fetch customers", err);
+    }
+  };
+
+  const fetchProducts = async () => {
+    try {
+      const res = await fetch("http://localhost:8000/api/inventory/products/");
+      const data = await res.json();
+      setProducts(data.results || data);
+    } catch (err) {
+      console.error("Failed to fetch products", err);
+    }
+  };
 
   const metrics = useMemo(() => {
-    const totals = invoices.reduce(
+    const list = Array.isArray(invoices) ? invoices : [];
+    return list.reduce(
       (accumulator, invoice) => {
-        accumulator.totalSales += invoice.totalAmount;
-        accumulator.totalPaid += invoice.paid;
-        accumulator.totalDue += invoice.due;
-        accumulator.totalProfit += invoice.profit;
+        accumulator.totalSales += parseFloat(invoice.total_amount || 0);
+        accumulator.totalPaid += parseFloat(invoice.paid_amount || 0);
+        accumulator.totalDue += parseFloat(invoice.due_amount || 0);
+        accumulator.totalProfit += parseFloat(invoice.profit || 0);
         return accumulator;
       },
       { totalSales: 0, totalPaid: 0, totalDue: 0, totalProfit: 0 }
     );
-
-    return totals;
   }, [invoices]);
 
   const filteredInvoices = useMemo(() => {
+    const list = Array.isArray(invoices) ? invoices : [];
     const normalizedSearch = search.trim().toLowerCase();
 
-    return invoices.filter((invoice) => {
-      const inSearch =
+    return list.filter((invoice) => {
+      const searchMatch =
         !normalizedSearch ||
-        [invoice.id, invoice.customer, invoice.salePerson].some((value) => value.toLowerCase().includes(normalizedSearch));
+        [invoice.invoice_number, invoice.customer_name, invoice.sales_person].some((value) => 
+          value?.toLowerCase().includes(normalizedSearch)
+        );
 
-      const inDateRange = (!startDate || invoice.date >= startDate) && (!endDate || invoice.date <= endDate);
+      const dateMatch = (!startDate || invoice.invoice_date >= startDate) && (!endDate || invoice.invoice_date <= endDate);
 
-      return inSearch && inDateRange;
+      return searchMatch && dateMatch;
     });
   }, [endDate, invoices, search, startDate]);
 
   const resetForm = () => {
-    setFormData(emptyForm);
+    setFormData({
+      ...emptyForm,
+      invoice_date: new Date().toISOString().split("T")[0],
+    });
+    setLineItems([]);
     setEditingInvoiceId(null);
+  };
+
+  const addLineItem = () => {
+    setLineItems([...lineItems, { product: "", quantity: 1, price: 0, discount: 0, tax: 0 }]);
+  };
+
+  const removeLineItem = (index) => {
+    setLineItems(lineItems.filter((_, i) => i !== index));
+  };
+
+  const updateLineItem = (index, field, value) => {
+    const updated = [...lineItems];
+    updated[index][field] = value;
+    updated[index].line_total = updated[index].quantity * updated[index].price;
+    setLineItems(updated);
+  };
+
+  const calculateTotals = () => {
+    const total = lineItems.reduce((sum, item) => sum + (item.line_total || 0), 0);
+    setFormData(prev => ({
+      ...prev,
+      total_amount: total.toString(),
+    }));
   };
 
   const openCreateForm = () => {
@@ -128,45 +143,90 @@ export default function SaleInvoicePage() {
     setEditingInvoiceId(invoice.id);
     setFormData({
       id: invoice.id,
-      date: invoice.date,
-      customer: invoice.customer,
-      totalAmount: String(invoice.totalAmount),
-      paid: String(invoice.paid),
-      due: String(invoice.due),
-      tax: String(invoice.tax),
-      dueDate: invoice.dueDate,
-      profit: String(invoice.profit),
-      salePerson: invoice.salePerson,
+      invoice_number: invoice.invoice_number || "",
+      invoice_date: invoice.invoice_date || "",
+      customer: invoice.customer || "",
+      total_amount: String(invoice.total_amount || 0),
+      paid_amount: String(invoice.paid_amount || 0),
+      due_amount: String(invoice.due_amount || 0),
+      total_tax: String(invoice.total_tax || 0),
+      due_date: invoice.due_date || "",
+      profit: String(invoice.profit || 0),
+      sales_person: invoice.sales_person || "",
     });
     setIsFormOpen(true);
   };
 
-  const saveInvoice = () => {
-    const nextInvoice = {
-      id: formData.id || `INV-${String(invoices.length + 10428).padStart(5, "0")}`,
-      date: formData.date,
-      customer: formData.customer,
-      totalAmount: Number(formData.totalAmount || 0),
-      paid: Number(formData.paid || 0),
-      due: Number(formData.due || 0),
-      tax: Number(formData.tax || 0),
-      dueDate: formData.dueDate,
-      profit: Number(formData.profit || 0),
-      salePerson: formData.salePerson,
-    };
+  const saveInvoice = async () => {
+    if (!formData.customer) {
+      alert("Please select a customer.");
+      return;
+    }
+    try {
+      const isEditing = !!editingInvoiceId;
+      const url = isEditing 
+        ? `http://localhost:8000/api/sales/invoices/${editingInvoiceId}/`
+        : "http://localhost:8000/api/sales/invoices/";
+      
+      const payload = {
+        invoice_number: formData.invoice_number || `INV-${Date.now().toString().slice(-5)}`,
+        invoice_date: formData.invoice_date || new Date().toISOString().split("T")[0],
+        customer: formData.customer,
+        sales_person: formData.sales_person || "",
+        total_amount: parseFloat(formData.total_amount) || 0,
+        paid_amount: parseFloat(formData.paid_amount) || 0,
+        due_amount: parseFloat(formData.due_amount) || 0,
+        total_tax: parseFloat(formData.total_tax) || 0,
+        profit: parseFloat(formData.profit) || 0,
+        status: "UNPAID",
+        items: lineItems.map(item => ({
+          product: parseInt(item.product),
+          quantity: parseInt(item.quantity),
+          price: parseFloat(item.price),
+          discount: parseFloat(item.discount) || 0,
+          tax: parseFloat(item.tax) || 0,
+          line_total: parseFloat(item.line_total) || 0,
+        }))
+      };
 
-    setInvoices((current) =>
-      editingInvoiceId
-        ? current.map((invoice) => (invoice.id === editingInvoiceId ? nextInvoice : invoice))
-        : [nextInvoice, ...current]
-    );
+      if (formData.due_date) {
+        payload.due_date = formData.due_date;
+      }
 
-    setIsFormOpen(false);
-    resetForm();
+      const res = await fetch(url, {
+        method: isEditing ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        alert("Invoice created successfully!");
+        setIsFormOpen(false);
+        resetForm();
+        fetchInvoices();
+      } else {
+        const error = await res.json();
+        console.error("Save error", error);
+        alert(`Failed to save invoice: ${JSON.stringify(error)}`);
+      }
+    } catch (err) {
+      console.error("Request error:", err);
+      alert(`Error: ${err.message}`);
+    }
   };
 
-  const deleteInvoice = (invoiceId) => {
-    setInvoices((current) => current.filter((invoice) => invoice.id !== invoiceId));
+  const deleteInvoice = async (invoiceId) => {
+    if (!confirm("Are you sure you want to delete this invoice?")) return;
+    try {
+      const res = await fetch(`http://localhost:8000/api/sales/invoices/${invoiceId}/`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        fetchInvoices();
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   return (
@@ -234,14 +294,14 @@ export default function SaleInvoicePage() {
             <div className="flex flex-col gap-4 border-b border-[rgba(0,0,0,0.06)] px-4 py-4 md:flex-row md:items-center md:justify-between md:px-5">
               <div>
                 <h2 className="font-['Poppins',sans-serif] text-lg font-bold text-[#0a0d14]">Sale Invoice</h2>
-                <p className="text-sm text-[#6b7280]">Invoice records shown from the screenshot layout</p>
+                <p className="text-sm text-[#6b7280]">All sale invoices and transactions</p>
               </div>
 
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2 rounded-2xl border border-[rgba(0,0,0,0.08)] bg-white px-4 py-3 text-sm text-[#2e3347] shadow-sm">
-                  <input value={startDate} onChange={(event) => setStartDate(event.target.value)} className="w-28 bg-transparent outline-none" />
+                  <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} className="w-32 bg-transparent outline-none" />
                   <span>→</span>
-                  <input value={endDate} onChange={(event) => setEndDate(event.target.value)} className="w-28 bg-transparent outline-none" />
+                  <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} className="w-32 bg-transparent outline-none" />
                   <span>📅</span>
                 </div>
                 <button onClick={openCreateForm} className="inline-flex items-center gap-2 rounded-2xl bg-[#4f6ef7] px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-[#4f6ef7]/25 transition hover:bg-[#3d5ce6]">
@@ -307,22 +367,22 @@ export default function SaleInvoicePage() {
                   ) : (
                     filteredInvoices.map((invoice) => (
                       <tr key={invoice.id} className="border-t border-[rgba(0,0,0,0.04)] text-sm hover:bg-[#f9fafb]">
-                        <td className="px-4 py-4 font-medium text-[#0a0d14]">{invoice.id}</td>
-                        <td className="px-4 py-4 text-[#2e3347]">{invoice.date}</td>
-                        <td className="px-4 py-4 text-[#2e3347]">{invoice.customer}</td>
-                        <td className="px-4 py-4 font-semibold text-[#0a0d14]">{currencyFormatter.format(invoice.totalAmount)}</td>
-                        <td className="px-4 py-4 text-[#2e3347]">{currencyFormatter.format(invoice.paid)}</td>
-                        <td className="px-4 py-4 text-[#2e3347]">{currencyFormatter.format(invoice.due)}</td>
-                        <td className="px-4 py-4 text-[#2e3347]">{currencyFormatter.format(invoice.tax)}</td>
-                        <td className="px-4 py-4 text-[#2e3347]">{invoice.dueDate}</td>
+                        <td className="px-4 py-4 font-medium text-[#0a0d14]">{invoice.invoice_number}</td>
+                        <td className="px-4 py-4 text-[#2e3347]">{invoice.invoice_date}</td>
+                        <td className="px-4 py-4 text-[#2e3347]">{invoice.customer_name || "-"}</td>
+                        <td className="px-4 py-4 font-semibold text-[#0a0d14]">{currencyFormatter.format(invoice.total_amount)}</td>
+                        <td className="px-4 py-4 text-[#2e3347]">{currencyFormatter.format(invoice.paid_amount)}</td>
+                        <td className="px-4 py-4 text-[#2e3347]">{currencyFormatter.format(invoice.due_amount)}</td>
+                        <td className="px-4 py-4 text-[#2e3347]">{currencyFormatter.format(invoice.total_tax)}</td>
+                        <td className="px-4 py-4 text-[#2e3347]">{invoice.due_date || "-"}</td>
                         <td className="px-4 py-4 font-semibold text-[#4f6ef7]">{currencyFormatter.format(invoice.profit)}</td>
-                        <td className="px-4 py-4 text-[#6b7280]">{invoice.salePerson}</td>
+                        <td className="px-4 py-4 text-[#6b7280]">{invoice.sales_person || "-"}</td>
                         <td className="px-4 py-4">
                           <div className="flex items-center justify-end gap-2">
-                            <button onClick={() => openEditForm(invoice)} className="rounded-xl border border-[rgba(0,0,0,0.08)] bg-white px-3 py-2 text-xs font-semibold text-[#2e3347] shadow-sm transition hover:border-[#4f6ef7] hover:text-[#4f6ef7]">
+                            <button onClick={() => openEditForm(invoice)} className="rounded-xl border border-[rgba(0,0,0,0.08)] bg-white px-3 py-2 text-xs font-semibold text-[#2e3347] shadow-sm transition hover:border-[#4f6ef7] hover:text-[#4f6ef7] cursor-pointer">
                               Edit
                             </button>
-                            <button onClick={() => deleteInvoice(invoice.id)} className="rounded-xl border border-[rgba(0,0,0,0.08)] bg-white px-3 py-2 text-xs font-semibold text-[#f43f5e] shadow-sm transition hover:border-[#f43f5e]">
+                            <button onClick={() => deleteInvoice(invoice.id)} className="rounded-xl border border-[rgba(0,0,0,0.08)] bg-white px-3 py-2 text-xs font-semibold text-[#f43f5e] shadow-sm transition hover:border-[#f43f5e] cursor-pointer">
                               Delete
                             </button>
                           </div>
@@ -343,9 +403,9 @@ export default function SaleInvoicePage() {
             <div className="flex items-center justify-between border-b border-[rgba(0,0,0,0.06)] px-6 py-5">
               <div>
                 <h2 className="font-['Poppins',sans-serif] text-xl font-bold text-[#0a0d14]">{editingInvoiceId ? "Edit Invoice" : "Create Invoice"}</h2>
-                <p className="text-sm text-[#6b7280]">Enter the invoice details shown in the list view</p>
+                <p className="text-sm text-[#6b7280]">Enter the invoice details</p>
               </div>
-              <button onClick={() => setIsFormOpen(false)} className="text-[#6b7280] transition hover:text-[#0a0d14]">
+              <button onClick={() => setIsFormOpen(false)} className="text-[#6b7280] transition hover:text-[#0a0d14] cursor-pointer">
                 ✕
               </button>
             </div>
@@ -354,11 +414,11 @@ export default function SaleInvoicePage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="space-y-1 text-sm font-medium text-[#2e3347]">
                   Invoice ID
-                  <input value={formData.id} onChange={(event) => setFormData((current) => ({ ...current, id: event.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:border-[#4f6ef7]" placeholder="INV-10432" />
+                  <input value={formData.invoice_number} onChange={(event) => setFormData((current) => ({ ...current, invoice_number: event.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:border-[#4f6ef7]" placeholder="INV-10432" />
                 </label>
                 <label className="space-y-1 text-sm font-medium text-[#2e3347]">
                   Date
-                  <input value={formData.date} onChange={(event) => setFormData((current) => ({ ...current, date: event.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:border-[#4f6ef7]" />
+                  <input type="date" value={formData.invoice_date} onChange={(event) => setFormData((current) => ({ ...current, invoice_date: event.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:border-[#4f6ef7]" />
                 </label>
               </div>
 
@@ -366,59 +426,88 @@ export default function SaleInvoicePage() {
                 <label className="space-y-1 text-sm font-medium text-[#2e3347]">
                   Customer
                   <select value={formData.customer} onChange={(event) => setFormData((current) => ({ ...current, customer: event.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:border-[#4f6ef7]">
-                    {customerOptions.map((option) => (
-                      <option key={option}>{option}</option>
+                    <option value="">Select Customer</option>
+                    {customers.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
                 </label>
                 <label className="space-y-1 text-sm font-medium text-[#2e3347]">
                   Sale Person
-                  <select value={formData.salePerson} onChange={(event) => setFormData((current) => ({ ...current, salePerson: event.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:border-[#4f6ef7]">
-                    {salesPersonOptions.map((option) => (
-                      <option key={option}>{option}</option>
-                    ))}
-                  </select>
+                  <input value={formData.sales_person} onChange={(event) => setFormData((current) => ({ ...current, sales_person: event.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:border-[#4f6ef7]" placeholder="John Doe" />
                 </label>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="space-y-1 text-sm font-medium text-[#2e3347]">
                   Total Amount
-                  <input type="number" value={formData.totalAmount} onChange={(event) => setFormData((current) => ({ ...current, totalAmount: event.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:border-[#4f6ef7]" />
+                  <input type="number" step="0.01" value={formData.total_amount} onChange={(event) => setFormData((current) => ({ ...current, total_amount: event.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:border-[#4f6ef7]" />
                 </label>
                 <label className="space-y-1 text-sm font-medium text-[#2e3347]">
                   Paid
-                  <input type="number" value={formData.paid} onChange={(event) => setFormData((current) => ({ ...current, paid: event.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:border-[#4f6ef7]" />
+                  <input type="number" step="0.01" value={formData.paid_amount} onChange={(event) => setFormData((current) => ({ ...current, paid_amount: event.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:border-[#4f6ef7]" />
                 </label>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="space-y-1 text-sm font-medium text-[#2e3347]">
                   Due
-                  <input type="number" value={formData.due} onChange={(event) => setFormData((current) => ({ ...current, due: event.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:border-[#4f6ef7]" />
+                  <input type="number" step="0.01" value={formData.due_amount} onChange={(event) => setFormData((current) => ({ ...current, due_amount: event.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:border-[#4f6ef7]" />
                 </label>
                 <label className="space-y-1 text-sm font-medium text-[#2e3347]">
                   Tax
-                  <input type="number" value={formData.tax} onChange={(event) => setFormData((current) => ({ ...current, tax: event.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:border-[#4f6ef7]" />
+                  <input type="number" step="0.01" value={formData.total_tax} onChange={(event) => setFormData((current) => ({ ...current, total_tax: event.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:border-[#4f6ef7]" />
                 </label>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="space-y-1 text-sm font-medium text-[#2e3347]">
                   Due Date
-                  <input value={formData.dueDate} onChange={(event) => setFormData((current) => ({ ...current, dueDate: event.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:border-[#4f6ef7]" />
+                  <input type="date" value={formData.due_date} onChange={(event) => setFormData((current) => ({ ...current, due_date: event.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:border-[#4f6ef7]" />
                 </label>
                 <label className="space-y-1 text-sm font-medium text-[#2e3347]">
                   Profit
-                  <input type="number" value={formData.profit} onChange={(event) => setFormData((current) => ({ ...current, profit: event.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:border-[#4f6ef7]" />
+                  <input type="number" step="0.01" value={formData.profit} onChange={(event) => setFormData((current) => ({ ...current, profit: event.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:border-[#4f6ef7]" />
                 </label>
               </div>
 
+              <div className="border-t border-gray-200 pt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-[#2e3347]">Line Items</h3>
+                  <button onClick={addLineItem} className="text-xs bg-blue-100 text-[#4f6ef7] px-3 py-1 rounded-lg hover:bg-blue-200">
+                    + Add Product
+                  </button>
+                </div>
+
+                <div className="space-y-3 max-h-60 overflow-y-auto">
+                  {lineItems.length === 0 ? (
+                    <p className="text-xs text-[#9ca3af]">No items added yet</p>
+                  ) : (
+                    lineItems.map((item, idx) => (
+                      <div key={idx} className="grid gap-2 grid-cols-6 text-xs">
+                        <select value={item.product} onChange={(e) => updateLineItem(idx, "product", e.target.value)} className="col-span-2 rounded border border-gray-200 px-2 py-1 outline-none focus:border-[#4f6ef7]">
+                          <option value="">Select Product</option>
+                          {products.map(p => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                          ))}
+                        </select>
+                        <input type="number" min="1" value={item.quantity} onChange={(e) => updateLineItem(idx, "quantity", e.target.value)} placeholder="Qty" className="rounded border border-gray-200 px-2 py-1 outline-none focus:border-[#4f6ef7]" />
+                        <input type="number" step="0.01" value={item.price} onChange={(e) => updateLineItem(idx, "price", e.target.value)} placeholder="Price" className="rounded border border-gray-200 px-2 py-1 outline-none focus:border-[#4f6ef7]" />
+                        <div className="rounded border border-gray-200 px-2 py-1 bg-gray-50 flex items-center">
+                          £{(item.line_total || 0).toFixed(2)}
+                        </div>
+                        <button onClick={() => removeLineItem(idx)} className="text-red-500 hover:text-red-700 font-semibold">×</button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
               <div className="flex gap-3 pt-2">
-                <button onClick={() => setIsFormOpen(false)} className="flex-1 rounded-2xl border border-[rgba(0,0,0,0.08)] bg-white px-5 py-3 text-sm font-semibold text-[#2e3347] shadow-sm transition hover:border-[#4f6ef7] hover:text-[#4f6ef7]">
+                <button onClick={() => setIsFormOpen(false)} className="flex-1 rounded-2xl border border-[rgba(0,0,0,0.08)] bg-white px-5 py-3 text-sm font-semibold text-[#2e3347] shadow-sm transition hover:border-[#4f6ef7] hover:text-[#4f6ef7] cursor-pointer">
                   Cancel
                 </button>
-                <button onClick={saveInvoice} className="flex-1 rounded-2xl bg-[#4f6ef7] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-[#4f6ef7]/25 transition hover:bg-[#3d5ce6]">
+                <button onClick={saveInvoice} className="flex-1 rounded-2xl bg-[#4f6ef7] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-[#4f6ef7]/25 transition hover:bg-[#3d5ce6] cursor-pointer">
                   {editingInvoiceId ? "Update Invoice" : "Create Invoice"}
                 </button>
               </div>
