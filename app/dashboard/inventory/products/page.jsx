@@ -1,7 +1,11 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import Image from 'next/image';
 import Sidebar from '../../Sidebar';
+import apiFetch from '../../../lib/api';
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 // Mock category data
 const initialCategories = [
@@ -30,79 +34,8 @@ const initialSubcategories = [
   { id: 'SC005', name: 'Mice' },
 ];
 
-// Mock product data
-const mockProducts = [
-  {
-    id: 'P001',
-    image: '📱',
-    name: 'Apple iPhone 15',
-    brand: 'Apple',
-    subCategory: 'Smartphones',
-    sku: 'SKU-1001',
-    purchasePrice: 450,
-    vat: 80,
-    salePrice: 999,
-    quantity: 145,
-    uom: 'Unit',
-    reorderQty: 50,
-  },
-  {
-    id: 'P002',
-    image: '💻',
-    name: 'MacBook Air M3',
-    brand: 'Apple',
-    subCategory: 'Laptops',
-    sku: 'SKU-1002',
-    purchasePrice: 800,
-    vat: 144,
-    salePrice: 1599,
-    quantity: 32,
-    uom: 'Unit',
-    reorderQty: 15,
-  },
-  {
-    id: 'P003',
-    image: '🖥️',
-    name: 'Dell Monitor 27"',
-    brand: 'Dell',
-    subCategory: 'Monitors',
-    sku: 'SKU-1003',
-    purchasePrice: 200,
-    vat: 36,
-    salePrice: 449,
-    quantity: 78,
-    uom: 'Unit',
-    reorderQty: 20,
-  },
-  {
-    id: 'P004',
-    image: '⌨️',
-    name: 'Mechanical Keyboard RGB',
-    brand: 'Corsair',
-    subCategory: 'Keyboards',
-    sku: 'SKU-1004',
-    purchasePrice: 80,
-    vat: 14,
-    salePrice: 189,
-    quantity: 234,
-    uom: 'Unit',
-    reorderQty: 100,
-  },
-  {
-    id: 'P005',
-    image: '🖱️',
-    name: 'Wireless Mouse Pro',
-    brand: 'Logitech',
-    subCategory: 'Mice',
-    sku: 'SKU-1005',
-    purchasePrice: 35,
-    vat: 6,
-    salePrice: 79,
-    quantity: 412,
-    uom: 'Unit',
-    reorderQty: 150,
-  },
-];
+// products will be loaded from the backend
+const mockProducts = [];
 
 const allColumns = [
   { id: 'id', label: 'ID', visible: true },
@@ -226,6 +159,7 @@ function AddProductModal({ isOpen, onClose, onSave, categories, brands, subcateg
             <label className="block text-sm font-semibold text-[#0a0d14] mb-3">Product Image</label>
             {formData.imagePreview ? (
               <div className="relative inline-block">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={formData.imagePreview}
                   alt="Product preview"
@@ -687,18 +621,56 @@ export default function ProductsPage() {
   const [categories, setCategories] = useState(initialCategories);
   const [brands, setBrands] = useState(initialBrands);
   const [subcategories, setSubcategories] = useState(initialSubcategories);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        const data = await apiFetch('/api/inventory/products/');
+        // data may be paginated or a list; handle common DRF responses
+        const list = Array.isArray(data) ? data : data.results || [];
+        const normalized = list.map((p) => ({
+          id: p.id || p.sku,
+          image: p.image || null,
+          name: p.name,
+          brand: p.brand_name || (p.brand && p.brand.name) || '',
+          subCategory: p.subcategory_name || (p.subcategory && p.subcategory.name) || '',
+          sku: p.sku,
+          purchasePrice: p.purchase_price,
+          vat: p.tax || 0,
+          salePrice: p.sale_price,
+          quantity: p.quantity,
+          uom: p.unit_of_measure || 'Unit',
+          reorderQty: p.reorder_qty,
+        }));
+        if (mounted) setProducts(normalized);
+      } catch (err) {
+        if (mounted) setError(err.message || 'Failed to load products');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Filter products based on search query
   const filteredProducts = useMemo(() => {
-    if (!searchQuery.trim()) return mockProducts;
+    const source = products.length ? products : mockProducts;
+    if (!searchQuery.trim()) return source;
     const query = searchQuery.toLowerCase();
-    return mockProducts.filter(
+    return source.filter(
       (product) =>
-        product.name.toLowerCase().includes(query) ||
-        product.sku.toLowerCase().includes(query) ||
-        product.brand.toLowerCase().includes(query)
+        (product.name || '').toString().toLowerCase().includes(query) ||
+        (product.sku || '').toString().toLowerCase().includes(query) ||
+        (product.brand || '').toString().toLowerCase().includes(query)
     );
-  }, [searchQuery]);
+  }, [searchQuery, products]);
 
   const handleToggleColumn = (columnId) => {
     setVisibleColumns((prev) =>
@@ -823,7 +795,9 @@ export default function ProductsPage() {
 
         {/* Table Section */}
         <section className="px-4 py-6 md:px-8">
-          {filteredProducts.length === 0 ? (
+          {loading ? (
+            <div className="rounded-3xl border border-dashed border-[rgba(0,0,0,0.08)] p-6 text-sm text-[#6b7280]">Loading products...</div>
+          ) : filteredProducts.length === 0 ? (
             <div className="rounded-3xl border border-[rgba(0,0,0,0.07)] bg-white p-12 text-center shadow-[0_12px_40px_rgba(10,13,20,0.05)]">
               <div className="flex justify-center mb-4">
                 <span className="text-5xl">💾</span>
@@ -850,7 +824,23 @@ export default function ProductsPage() {
                       <tr key={product.id} className="border-t border-[rgba(0,0,0,0.05)] hover:bg-[#f4f6fb]/50 transition">
                         {visibleColsArray.map((column) => (
                           <td key={`${product.id}-${column.id}`} className="px-4 py-4 text-[#0a0d14]">
-                            {column.id === 'image' && <span className="text-2xl">{product[column.id]}</span>}
+                            {column.id === 'image' && (
+                              product.image ? (
+                                (() => {
+                                  let src = product.image;
+                                  if (!/^https?:\/\//i.test(src)) {
+                                    src = `${API_BASE}${src.startsWith('/') ? '' : '/'}${src}`;
+                                  }
+                                  return (
+                                    <div className="h-12 w-12 relative">
+                                      <Image src={src} alt={product.name || 'product image'} fill className="rounded-xl object-cover" />
+                                    </div>
+                                  );
+                                })()
+                              ) : (
+                                <div className="h-12 w-12 rounded-xl bg-[#f4f6fb] flex items-center justify-center text-2xl">📦</div>
+                              )
+                            )}
                             {column.id === 'purchasePrice' && <span className="text-[#2e3347]">£{product[column.id]}</span>}
                             {column.id === 'salePrice' && <span className="font-semibold text-[#4f6ef7]">£{product[column.id]}</span>}
                             {column.id === 'quantity' && <StockBadge quantity={product.quantity} reorderQty={product.reorderQty} />}
@@ -879,7 +869,7 @@ export default function ProductsPage() {
 
               {/* Table Footer */}
               <div className="border-t border-[rgba(0,0,0,0.07)] bg-[#f4f6fb] px-4 py-3 text-xs text-[#6b7280]">
-                Showing {filteredProducts.length} of {mockProducts.length} products
+                Showing {filteredProducts.length} of {products.length || mockProducts.length} products
               </div>
             </article>
           )}

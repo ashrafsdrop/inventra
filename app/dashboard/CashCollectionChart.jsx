@@ -2,13 +2,7 @@
 
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
-const data = [
-  { name: "Paid", value: 64, color: "#4f6ef7" },
-  { name: "Due", value: 28, color: "#f59e0b" },
-  { name: "Return", value: 8, color: "#f43f5e" },
-];
-
-export default function CashCollectionChart() {
+export default function CashCollectionChart({ data = [], centerValue = "0%", centerLabel = "Collected" }) {
   return (
     <div className="relative h-[280px] w-full">
       <ResponsiveContainer width="100%" height="100%">
@@ -40,8 +34,8 @@ export default function CashCollectionChart() {
       </ResponsiveContainer>
 
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-        <div className="font-['Syne',sans-serif] text-4xl font-extrabold tracking-tight text-[#0a0d14]">92%</div>
-        <div className="text-xs text-[#6b7280]">Collected</div>
+        <div className="font-['Syne',sans-serif] text-4xl font-extrabold tracking-tight text-[#0a0d14]">{centerValue}</div>
+        <div className="text-xs text-[#6b7280]">{centerLabel}</div>
       </div>
     </div>
   );

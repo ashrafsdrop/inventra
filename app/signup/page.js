@@ -1,4 +1,5 @@
 import Link from "next/link";
+import SignupForm from "./SignupForm";
 
 export const metadata = {
   title: "Sign Up | Inventra ERP",
@@ -62,74 +63,7 @@ export default function SignupPage() {
                 </p>
               </div>
 
-              <form className="space-y-5">
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <label className="block">
-                    <span className="block text-sm font-semibold text-[#2e3347] mb-2">First Name</span>
-                    <input
-                      type="text"
-                      placeholder="Jane"
-                      className="w-full rounded-2xl border border-[rgba(0,0,0,0.08)] bg-[#f4f6fb] px-4 py-3.5 text-[#0a0d14] outline-none transition-all focus:border-[#4f6ef7] focus:ring-4 focus:ring-[#4f6ef7]/10"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="block text-sm font-semibold text-[#2e3347] mb-2">Last Name</span>
-                    <input
-                      type="text"
-                      placeholder="Doe"
-                      className="w-full rounded-2xl border border-[rgba(0,0,0,0.08)] bg-[#f4f6fb] px-4 py-3.5 text-[#0a0d14] outline-none transition-all focus:border-[#4f6ef7] focus:ring-4 focus:ring-[#4f6ef7]/10"
-                    />
-                  </label>
-                </div>
-
-                <label className="block">
-                  <span className="block text-sm font-semibold text-[#2e3347] mb-2">Work Email</span>
-                  <input
-                    type="email"
-                    placeholder="name@company.com"
-                    className="w-full rounded-2xl border border-[rgba(0,0,0,0.08)] bg-[#f4f6fb] px-4 py-3.5 text-[#0a0d14] outline-none transition-all focus:border-[#4f6ef7] focus:ring-4 focus:ring-[#4f6ef7]/10"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="block text-sm font-semibold text-[#2e3347] mb-2">Company Name</span>
-                  <input
-                    type="text"
-                    placeholder="Inventra Holdings"
-                    className="w-full rounded-2xl border border-[rgba(0,0,0,0.08)] bg-[#f4f6fb] px-4 py-3.5 text-[#0a0d14] outline-none transition-all focus:border-[#4f6ef7] focus:ring-4 focus:ring-[#4f6ef7]/10"
-                  />
-                </label>
-
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <label className="block">
-                    <span className="block text-sm font-semibold text-[#2e3347] mb-2">Password</span>
-                    <input
-                      type="password"
-                      placeholder="Create a password"
-                      className="w-full rounded-2xl border border-[rgba(0,0,0,0.08)] bg-[#f4f6fb] px-4 py-3.5 text-[#0a0d14] outline-none transition-all focus:border-[#4f6ef7] focus:ring-4 focus:ring-[#4f6ef7]/10"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="block text-sm font-semibold text-[#2e3347] mb-2">Confirm Password</span>
-                    <input
-                      type="password"
-                      placeholder="Repeat password"
-                      className="w-full rounded-2xl border border-[rgba(0,0,0,0.08)] bg-[#f4f6fb] px-4 py-3.5 text-[#0a0d14] outline-none transition-all focus:border-[#4f6ef7] focus:ring-4 focus:ring-[#4f6ef7]/10"
-                    />
-                  </label>
-                </div>
-
-                <label className="flex items-start gap-3 text-sm text-[#6b7280]">
-                  <input type="checkbox" className="mt-1 h-4 w-4 rounded border-[rgba(0,0,0,0.15)] accent-[#4f6ef7]" />
-                  <span>
-                    I agree to the <a href="#" className="font-medium text-[#4f6ef7] hover:text-[#3d5ce6] transition-colors">Terms</a> and <a href="#" className="font-medium text-[#4f6ef7] hover:text-[#3d5ce6] transition-colors">Privacy Policy</a>.
-                  </span>
-                </label>
-
-                <button className="cursor-pointer w-full rounded-2xl bg-[#4f6ef7] px-5 py-3.5 text-sm font-semibold text-white shadow-lg shadow-[#4f6ef7]/30 transition-all hover:-translate-y-0.5 hover:bg-[#3d5ce6]">
-                  Create Account
-                </button>
-              </form>
+              <SignupForm />
 
               <div className="mt-8 flex items-center gap-3 text-sm text-[#6b7280]">
                 <span className="h-px flex-1 bg-[rgba(0,0,0,0.08)]" />

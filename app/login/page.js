@@ -1,9 +1,9 @@
-import Link from "next/link";
-
 export const metadata = {
   title: "Login | Inventra ERP",
   description: "Sign in to Inventra ERP to manage operations, automate workflows, and access enterprise dashboards.",
 };
+import Link from "next/link";
+import LoginForm from "./LoginForm";
 
 export default function LoginPage() {
   return (
@@ -62,39 +62,7 @@ export default function LoginPage() {
                 </p>
               </div>
 
-              <form className="space-y-5">
-                <label className="block">
-                  <span className="block text-sm font-semibold text-[#2e3347] mb-2">Work Email</span>
-                  <input
-                    type="email"
-                    placeholder="name@company.com"
-                    className="w-full rounded-2xl border border-[rgba(0,0,0,0.08)] bg-[#f4f6fb] px-4 py-3.5 text-[#0a0d14] outline-none transition-all focus:border-[#4f6ef7] focus:ring-4 focus:ring-[#4f6ef7]/10"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="block text-sm font-semibold text-[#2e3347] mb-2">Password</span>
-                  <input
-                    type="password"
-                    placeholder="Enter your password"
-                    className="w-full rounded-2xl border border-[rgba(0,0,0,0.08)] bg-[#f4f6fb] px-4 py-3.5 text-[#0a0d14] outline-none transition-all focus:border-[#4f6ef7] focus:ring-4 focus:ring-[#4f6ef7]/10"
-                  />
-                </label>
-
-                <div className="flex items-center justify-between gap-4 text-sm">
-                  <label className="flex items-center gap-2 text-[#6b7280]">
-                    <input type="checkbox" className="h-4 w-4 rounded border-[rgba(0,0,0,0.15)] accent-[#4f6ef7]" />
-                    Remember me
-                  </label>
-                  <a href="#" className="font-medium text-[#4f6ef7] hover:text-[#3d5ce6] transition-colors">
-                    Forgot password?
-                  </a>
-                </div>
-
-                <button className="cursor-pointer w-full rounded-2xl bg-[#4f6ef7] px-5 py-3.5 text-sm font-semibold text-white shadow-lg shadow-[#4f6ef7]/30 transition-all hover:-translate-y-0.5 hover:bg-[#3d5ce6]">
-                  Sign In
-                </button>
-              </form>
+              <LoginForm />
 
               <div className="mt-8 flex items-center gap-3 text-sm text-[#6b7280]">
                 <span className="h-px flex-1 bg-[rgba(0,0,0,0.08)]" />
