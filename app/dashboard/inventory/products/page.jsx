@@ -943,17 +943,8 @@ export default function ProductsPage() {
                           <td key={`${product.id}-${column.id}`} className="px-4 py-4 text-[#0a0d14]">
                             {column.id === 'image' && (
                               product.image ? (
-                                (() => {
-                                  let src = product.image;
-                                  if (!/^https?:\/\//i.test(src)) {
-                                    src = `${API_BASE}${src.startsWith('/') ? '' : '/'}${src}`;
-                                  }
-                                  return (
-                                    <div className="h-12 w-12 relative">
-                                      <Image src={src} alt={product.name || 'product image'} fill className="rounded-xl object-cover" />
-                                    </div>
-                                  );
-                                })()
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={product.image} alt={product.name || 'product'} className="h-12 w-12 rounded-xl object-cover" />
                               ) : (
                                 <div className="h-12 w-12 rounded-xl bg-[#f4f6fb] flex items-center justify-center text-2xl">📦</div>
                               )
