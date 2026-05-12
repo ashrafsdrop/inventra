@@ -1,11 +1,8 @@
+'use client';
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Sidebar from "../../Sidebar";
-import SectionHeader from "../../components/SectionHeader";
-
-export const metadata = {
-  title: "Sales Reports | Inventra ERP",
-  description: "Sales performance, revenue trends, and customer insights",
-};
 
 const salesReportData = [
   { period: "January", sales: 145000, target: 150000, customers: 234, orders: 512 },
@@ -14,14 +11,6 @@ const salesReportData = [
   { period: "April", sales: 178000, target: 150000, customers: 278, orders: 612 },
   { period: "May", sales: 192000, target: 150000, customers: 301, orders: 667 },
   { period: "June", sales: 186000, target: 150000, customers: 289, orders: 645 },
-];
-
-const topProducts = [
-  { name: "Apple iPhone 14", sales: 542000, units: 1240, growth: "+18.5%" },
-  { name: "MacBook Air M2", sales: 456000, units: 412, growth: "+12.3%" },
-  { name: "iPad Pro", sales: 378000, units: 589, growth: "+22.1%" },
-  { name: "AirPods Pro", sales: 245000, units: 1856, growth: "+35.2%" },
-  { name: "Apple Watch", sales: 189000, units: 734, growth: "+8.9%" },
 ];
 
 const StatCard = ({ label, value, change, tone }) => (
@@ -39,6 +28,26 @@ const StatCard = ({ label, value, change, tone }) => (
 );
 
 export default function SalesReportsPage() {
+  const [topProducts, setTopProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchTopProducts = async () => {
+      try {
+        const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        const res = await fetch(`${API_BASE}/api/dashboard/summary/`, { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          setTopProducts(data.top_products || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch top products:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTopProducts();
+  }, []);
   return (
     <main className="min-h-screen bg-[#f4f6fb] text-[#0a0d14]">
       <Sidebar activeLabel="SALES REPORTS" />
@@ -119,20 +128,29 @@ export default function SalesReportsPage() {
               <p className="text-sm text-[#6b7280]">Best performing products by revenue</p>
             </div>
 
-            <div className="space-y-4">
-              {topProducts.map((product, idx) => (
-                <div key={idx} className="flex items-center justify-between rounded-2xl border border-[rgba(0,0,0,0.04)] p-4 hover:bg-[#f9fafb] transition cursor-pointer">
-                  <div className="flex-1">
-                    <p className="font-medium text-[#0a0d14]">{product.name}</p>
-                    <p className="text-sm text-[#6b7280]">{product.units} units sold</p>
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <p className="text-[#6b7280]">Loading top products...</p>
+              </div>
+            ) : topProducts.length > 0 ? (
+              <div className="space-y-4">
+                {topProducts.map((product, idx) => (
+                  <div key={idx} className="flex items-center justify-between rounded-2xl border border-[rgba(0,0,0,0.04)] p-4 hover:bg-[#f9fafb] transition cursor-pointer">
+                    <div className="flex-1">
+                      <p className="font-medium text-[#0a0d14]">{product.name}</p>
+                      <p className="text-sm text-[#6b7280]">{product.quantity.toLocaleString()} units sold</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-[#0a0d14]">{product.amount}</p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-bold text-[#0a0d14]">£{(product.sales / 1000).toFixed(0)}K</p>
-                    <p className="text-sm font-semibold text-[#0ec4a8]">{product.growth}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-[#6b7280]">No top products data available</p>
+              </div>
+            )}
           </div>
         </section>
       </div>
